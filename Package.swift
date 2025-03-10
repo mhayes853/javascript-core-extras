@@ -30,7 +30,8 @@ let package = Package(
       dependencies: [
         "_CJavaScriptCoreExtras",
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay")
-      ]
+      ],
+      resources: [.process("js")]
     ),
     .testTarget(
       name: "JavaScriptCoreExtrasTests",
