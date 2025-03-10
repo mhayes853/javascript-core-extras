@@ -45,5 +45,6 @@ let package = Package(
       ]
     ),
     .target(name: "_CJavaScriptCoreExtras")
-  ]
+  ],
+  swiftLanguageModes: [.v6]
 )
