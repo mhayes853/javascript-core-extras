@@ -6,7 +6,7 @@ function FormData() {
 }
 
 function _jsCoreExtrasFormDataBoundary() {
-  return `-----JSCoreExtrasBoundary${Math.random().toString(36).substring(2)}`;
+  return `-----JavaScriptCoreExtrasBoundary${Math.random().toString(36).substring(2)}`;
 }
 
 Object.defineProperties(FormData.prototype, {
