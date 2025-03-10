@@ -35,18 +35,16 @@ import JavaScriptCore
   /// The `URL` of this file if it was not initialized through Javascript.
   public let url: URL?
 
-  #if canImport(UniformTypeIdentifiers)
-    /// Creates a file from the contents of the specified `URL`.
-    ///
-    /// The direct contents of the file are only read when retrieving the bytes directly, and are not
-    /// read in this initializer.
-    ///
-    /// - Parameter url: The `URL` of the file.
-    @available(iOS 14, macOS 11, tvOS 14, watchOS 7, *)
-    public convenience init(contentsOf url: URL) throws {
-      try self.init(contentsOf: url, type: MIMEType(of: url) ?? .empty)
-    }
-  #endif
+  /// Creates a file from the contents of the specified `URL`.
+  ///
+  /// The direct contents of the file are only read when retrieving the bytes directly, and are not
+  /// read in this initializer.
+  ///
+  /// - Parameter url: The `URL` of the file.
+  @available(iOS 14, macOS 11, tvOS 14, watchOS 7, visionOS 1, *)
+  public convenience init(contentsOf url: URL) throws {
+    try self.init(contentsOf: url, type: MIMEType(of: url) ?? .empty)
+  }
 
   /// Creates a file from the contents of the specified `URL` and `MIMEType`.
   ///
@@ -178,7 +176,7 @@ private struct FileJSBlobStorage: JSBlobStorage {
     do {
       let data = try NSFileCoordinator()
         .coordinate(readingItemAt: self.url) { url in
-          let handle = try JavaScriptCoreExtrasFileHandle(url: url)
+          let handle = try JSCoreExtrasFileHandle(url: url)
           return try handle.read(
             fromOffset: UInt64(startIndex),
             count: UInt64(endIndex - startIndex)

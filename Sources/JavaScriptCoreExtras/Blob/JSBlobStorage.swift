@@ -53,7 +53,8 @@ extension String.UTF8View: JSBlobStorage {
   public var utf8SizeInBytes: Int64 { Int64(self.count) }
 
   public func utf8Bytes(startIndex: Int64, endIndex: Int64, context: JSContext) -> Self {
-    self[self.indexRange].utf8Bytes(startIndex: startIndex, endIndex: endIndex, context: context)
+    self[self.startIndex..<self.endIndex]
+      .utf8Bytes(startIndex: startIndex, endIndex: endIndex, context: context)
   }
 }
 

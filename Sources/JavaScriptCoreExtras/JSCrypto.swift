@@ -16,8 +16,10 @@ public struct JSCryptoInstaller: JSContextInstallable {
     var bytes = [UInt8](repeating: 0, count: count)
     let result = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
     if result != errSecSuccess {
+      let errorMessage =
+        SecCopyErrorMessageString(result, nil) as? String ?? "Unknown Security Framework Error"
       JSContext.current()?.exception = JSValue(
-        newErrorFromMessage: SecError(code: result).message,
+        newErrorFromMessage: errorMessage,
         in: .current()
       )
     }
