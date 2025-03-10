@@ -197,7 +197,7 @@ struct JSPromiseTests {
 
   @Test("Reports Issue When Continuation Resumed More Than Once")
   func resumeMoreThanOnce() async throws {
-    await withExpectedIssue {
+    await withKnownIssue {
       _ = try await JSPromise(in: self.context) { continuation in
         continuation.resume(resolving: JSValue(int32: 5, in: continuation.context))
         continuation.resume(rejecting: JSValue(nullIn: continuation.context))
