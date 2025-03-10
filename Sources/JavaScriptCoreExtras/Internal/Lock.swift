@@ -20,7 +20,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
 
 // MARK: - WithLock
 
-package extension Lock {
+extension Lock {
   /// Calls the specified closure with the lock acquired and gives up ownership of the value.
   ///
   /// > Warning: Do not call this method from within `body`, this will cause a deadlock.

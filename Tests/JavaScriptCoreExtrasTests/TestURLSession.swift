@@ -1,4 +1,4 @@
-import WPFoundation
+import Foundation
 
 // MARK: - ResponseBody
 

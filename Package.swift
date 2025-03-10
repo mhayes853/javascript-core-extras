@@ -22,7 +22,8 @@ let package = Package(
     .package(
       url: "https://github.com/pointfreeco/xctest-dynamic-overlay",
       .upToNextMajor(from: "1.2.2")
-    )
+    ),
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3")
   ],
   targets: [
     .target(
@@ -39,7 +40,8 @@ let package = Package(
         "JavaScriptCoreExtras",
         .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
-        .product(name: "IssueReporting", package: "xctest-dynamic-overlay")
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+        .product(name: "CustomDump", package: "swift-custom-dump")
       ]
     ),
     .target(name: "_CJavaScriptCoreExtras")

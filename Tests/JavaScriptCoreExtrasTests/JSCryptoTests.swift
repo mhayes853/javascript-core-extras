@@ -113,3 +113,9 @@ struct JSCryptoTests {
     #expect(Array(array[16...]) != Array(repeating: 0, count: 16))
   }
 }
+
+extension UUID {
+  fileprivate var version: Int {
+    Int(self.uuid.6 >> 4)
+  }
+}
