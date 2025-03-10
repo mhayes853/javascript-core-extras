@@ -1,6 +1,6 @@
 const _jsCoreExtrasBodyKind = { Request: "Request", Response: "Response" };
 
-class _jsCoreExtrasHTTPBody {
+class _JSCoreExtrasHTTPBody {
   bodyKind = _jsCoreExtrasBodyKind.Request;
 
   get contentTypeHeader() {
@@ -40,16 +40,16 @@ class _jsCoreExtrasHTTPBody {
   }
 }
 
-class _jsCoreExtrasNullishBody extends _jsCoreExtrasHTTPBody {
-  static Request = _jsCoreExtrasNullishBody.ofKind(
+class _JSCoreExtrasNullishBody extends _JSCoreExtrasHTTPBody {
+  static Request = _JSCoreExtrasNullishBody.ofKind(
     _jsCoreExtrasBodyKind.Request,
   );
-  static Response = _jsCoreExtrasNullishBody.ofKind(
+  static Response = _JSCoreExtrasNullishBody.ofKind(
     _jsCoreExtrasBodyKind.Response,
   );
 
   static ofKind(bodyKind) {
-    const body = new _jsCoreExtrasNullishBody();
+    const body = new _JSCoreExtrasNullishBody();
     body.bodyKind = bodyKind;
     return body;
   }
@@ -67,7 +67,7 @@ class _jsCoreExtrasNullishBody extends _jsCoreExtrasHTTPBody {
   }
 }
 
-class _jsCoreExtrasToStringableBody extends _jsCoreExtrasHTTPBody {
+class _JSCoreExtrasToStringableBody extends _JSCoreExtrasHTTPBody {
   #value;
 
   get contentTypeHeader() {
@@ -92,7 +92,7 @@ class _jsCoreExtrasToStringableBody extends _jsCoreExtrasHTTPBody {
   }
 }
 
-class _jsCoreExtrasBlobBody extends _jsCoreExtrasHTTPBody {
+class _JSCoreExtrasBlobBody extends _JSCoreExtrasHTTPBody {
   #blob;
 
   get contentTypeHeader() {
@@ -117,7 +117,7 @@ class _jsCoreExtrasBlobBody extends _jsCoreExtrasHTTPBody {
   }
 }
 
-class _jsCoreExtrasArrayBufferBody extends _jsCoreExtrasHTTPBody {
+class _JSCoreExtrasArrayBufferBody extends _JSCoreExtrasHTTPBody {
   #buffer;
 
   get #text() {
@@ -142,7 +142,7 @@ class _jsCoreExtrasArrayBufferBody extends _jsCoreExtrasHTTPBody {
   }
 }
 
-class _jsCoreExtrasFormDataBody extends _jsCoreExtrasHTTPBody {
+class _JSCoreExtrasFormDataBody extends _JSCoreExtrasHTTPBody {
   #formData;
   #boundary;
 
@@ -208,17 +208,17 @@ function _jsCoreExtrasHTTPHeaders(headers, body) {
 function _jsCoreExtrasHTTPBody(rawBody, bodyKind) {
   let body;
   if (rawBody instanceof Blob) {
-    body = new _jsCoreExtrasBlobBody(rawBody);
+    body = new _JSCoreExtrasBlobBody(rawBody);
   } else if (rawBody === undefined || rawBody === null) {
-    body = _jsCoreExtrasNullishBody[bodyKind];
+    body = _JSCoreExtrasNullishBody[bodyKind];
   } else if (ArrayBuffer.isView(rawBody)) {
-    body = new _jsCoreExtrasArrayBufferBody(rawBody.buffer);
+    body = new _JSCoreExtrasArrayBufferBody(rawBody.buffer);
   } else if (rawBody instanceof ArrayBuffer) {
-    body = new _jsCoreExtrasArrayBufferBody(rawBody);
+    body = new _JSCoreExtrasArrayBufferBody(rawBody);
   } else if (rawBody instanceof FormData) {
-    body = new _jsCoreExtrasFormDataBody(rawBody);
+    body = new _JSCoreExtrasFormDataBody(rawBody);
   } else {
-    body = new _jsCoreExtrasToStringableBody(rawBody);
+    body = new _JSCoreExtrasToStringableBody(rawBody);
   }
   body.bodyKind = bodyKind;
   return body;
