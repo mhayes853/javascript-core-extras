@@ -31,7 +31,7 @@ let package = Package(
         "_CJavaScriptCoreExtras",
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay")
       ],
-      resources: [.process("js")]
+      resources: [.process("js"), .process("PrivacyInfo.xcprivacy")]
     ),
     .testTarget(
       name: "JavaScriptCoreExtrasTests",
