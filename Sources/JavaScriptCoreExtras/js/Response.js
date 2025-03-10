@@ -61,7 +61,7 @@ Response.json = function (jsonSerializeable, options) {
   const rawBody = JSON.stringify(jsonSerializeable);
   const headers = _jsCoreExtrasHTTPHeaders(
     options?.headers,
-    _jsCoreExtrasNullishBody.Response,
+    _JSCoreExtrasNullishBody.Response,
   );
   if (!headers.has("content-type")) {
     headers.set("content-type", "application/json");
