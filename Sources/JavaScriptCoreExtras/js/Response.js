@@ -58,6 +58,13 @@ Response.json = function (jsonSerializeable, options) {
     [jsonSerializeable, options],
     1,
   );
+  if (jsonSerializeable === undefined) {
+    throw _jsCoreExtrasFailedToExecute(
+      "Response",
+      "json",
+      "The data is not JSON serializable",
+    );
+  }
   const rawBody = JSON.stringify(jsonSerializeable);
   const headers = _jsCoreExtrasHTTPHeaders(
     options?.headers,

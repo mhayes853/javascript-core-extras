@@ -43,12 +43,12 @@ struct JSBlobTests {
   @Test(
     "Text",
     arguments: [
-      ("new Blob()", "")
-      //("new Blob([])", ""),
-      //("new Blob([\"foo\"])", "foo"),
-      //("new Blob([\"foo\", \"bar\"])", "foobar"),
-      //("new Blob(new Uint8Array(10))", "0000000000"),
-      //("new Blob(new Headers([[\"Key\", \"Value\"], [\"K\", \"V\"]]))", "key,Valuek,V")
+      ("new Blob()", ""),
+      ("new Blob([])", ""),
+      ("new Blob([\"foo\"])", "foo"),
+      ("new Blob([\"foo\", \"bar\"])", "foobar"),
+      ("new Blob(new Uint8Array(10))", "0000000000"),
+      ("new Blob(new Headers([[\"Key\", \"Value\"], [\"K\", \"V\"]]))", "key,Valuek,V")
     ]
   )
   func textFromIterable(initObject: String, expected: String) async throws {

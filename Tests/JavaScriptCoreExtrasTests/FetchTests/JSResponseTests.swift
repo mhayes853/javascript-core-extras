@@ -6,11 +6,11 @@ import Testing
 @Suite("JSResponse tests")
 struct JSResponseTests {
   private let context = JSContext()!
-
+  
   init() throws {
     try self.context.install([.consoleLogging, .response])
   }
-
+  
   @Test("Construct With Non-Object RequestInit")
   func nonObjectRequestInit() {
     expectErrorMessage(
@@ -22,7 +22,7 @@ struct JSResponseTests {
       in: self.context
     )
   }
-
+  
   @Test(
     "Valid Headers",
     arguments: [
@@ -47,7 +47,7 @@ struct JSResponseTests {
     )
     expectHeaders(from: value, toEqual: [["key", "value"], ["foo", "bar"]])
   }
-
+  
   @Test("Invalid Headers Init Throws Error")
   func invalidHeader() {
     expectErrorMessage(
@@ -59,7 +59,7 @@ struct JSResponseTests {
       in: self.context
     )
   }
-
+  
   @Test("Body Text")
   func bodyText() async throws {
     let value = self.context
@@ -72,7 +72,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toString(), "foo")
   }
-
+  
   @Test("Body Bytes")
   func bodyBytes() async throws {
     let value = self.context
@@ -85,7 +85,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toArray().compactMap { $0 as? UInt8 }, [0x66, 0x6F, 0x6F])
   }
-
+  
   @Test("Blob Body Bytes")
   func blobBodyBytes() async throws {
     let value = self.context
@@ -98,7 +98,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toArray().compactMap { $0 as? UInt8 }, [0x66, 0x6F, 0x6F])
   }
-
+  
   @Test("Uint8Array Body Bytes")
   func uint8ArrayBodyBytes() async throws {
     let value = self.context
@@ -111,7 +111,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toArray().compactMap { $0 as? UInt8 }, [0x66, 0x6F, 0x6F])
   }
-
+  
   @Test("Uint16Array Body Bytes")
   func uint16ArrayBodyBytes() async throws {
     let value = self.context
@@ -127,7 +127,7 @@ struct JSResponseTests {
       [0x66, 0x00, 0x6F, 0x00, 0x6F, 0x00]
     )
   }
-
+  
   @Test("Stringifies Non-Iterable Body")
   func stringifiesBody() async throws {
     let value = self.context
@@ -140,7 +140,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toString(), "[object Object]")
   }
-
+  
   @Test("Empty Body Text")
   func emptyBodyText() async throws {
     let value = self.context
@@ -153,7 +153,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toString(), "")
   }
-
+  
   @Test("Empty Body Bytes")
   func emptyBodyBytes() async throws {
     let value = self.context
@@ -166,7 +166,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toArray().compactMap { $0 as? UInt8 }, [])
   }
-
+  
   @Test("Uint8Array Body Text")
   func uint8ArrayBodyText() async throws {
     let value = self.context
@@ -179,7 +179,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toString(), "foo")
   }
-
+  
   @Test("Uint16Array Body Text")
   func uint16ArrayBodyText() async throws {
     let value = self.context
@@ -192,7 +192,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.toString(), "f\0o\0o\0")
   }
-
+  
   @Test(
     "Body Blob",
     arguments: [
@@ -218,7 +218,7 @@ struct JSResponseTests {
     expectNoDifference(resolved?.objectForKeyedSubscript("text").toString(), string)
     expectNoDifference(resolved?.objectForKeyedSubscript("isBlob").toBool(), true)
   }
-
+  
   @Test("Body JSON")
   func bodyJSON() async throws {
     let value = self.context
@@ -231,7 +231,7 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.objectForKeyedSubscript("a").toString(), "b")
   }
-
+  
   @Test("Blob Body JSON")
   func blobBodyJSON() async throws {
     let value = self.context
@@ -244,9 +244,9 @@ struct JSResponseTests {
     let resolved = try await value?.resolvedValue
     expectNoDifference(resolved?.objectForKeyedSubscript("a").toString(), "b")
   }
-
-  @Test("Invalid JSON")
-  func invalidJSON() async throws {
+  
+  @Test("Invalid JSON Response")
+  func invalidJSONResponse() async throws {
     let value = self.context
       .evaluateScript(
         """
@@ -255,7 +255,7 @@ struct JSResponseTests {
       )
       .toPromise()
     do {
-      try await value?.resolvedValue
+      _ = try await value?.resolvedValue
       reportIssue("Should reject")
     } catch {
       let error = try #require(error as? JSPromiseRejectedError)
@@ -265,7 +265,7 @@ struct JSResponseTests {
       )
     }
   }
-
+  
   @Test("Body Not Used When Created")
   func bodyNotUsed() {
     let value = self.context.evaluateScript(
@@ -275,7 +275,7 @@ struct JSResponseTests {
     )
     expectNoDifference(value?.toBool(), false)
   }
-
+  
   @Test(
     "Body Used After Consuming",
     arguments: ["text", "bytes", "blob", "arrayBuffer", "json", "formData"]
@@ -298,7 +298,7 @@ struct JSResponseTests {
     let resolvedValue = try await value?.resolvedValue
     expectNoDifference(resolvedValue?.toBool(), true)
   }
-
+  
   @Test(
     "Throws Error When Consuming Body a Second Time",
     arguments: ["text", "bytes", "blob", "arrayBuffer", "json", "formData"]
@@ -328,7 +328,7 @@ struct JSResponseTests {
       "Failed to execute '\(methodName)' on 'Response': body stream already read"
     )
   }
-
+  
   @Test(
     "Response Cloning Allows Second Consumption of Body",
     arguments: ["text", "bytes", "blob", "arrayBuffer", "json", "formData"]
@@ -357,7 +357,7 @@ struct JSResponseTests {
     let resolvedValue = try await value?.resolvedValue
     expectNoDifference(resolvedValue?.toBool(), true)
   }
-
+  
   @Test(
     "Cloning Consumed Response Carries Over Body Consumption Status",
     arguments: ["text", "bytes", "blob", "arrayBuffer", "json", "formData"]
@@ -388,7 +388,7 @@ struct JSResponseTests {
       "Failed to execute '\(methodName)' on 'Response': body stream already read"
     )
   }
-
+  
   @Test("Fails to Construct FormData Body if Body is Not FormData")
   func failsFormDataBody() async throws {
     let value = self.context
@@ -413,7 +413,7 @@ struct JSResponseTests {
       "Failed to execute 'formData' on 'Response': Failed to fetch"
     )
   }
-
+  
   @Test("Returns Form Data Body")
   func formDataBody() async throws {
     let value = self.context
@@ -436,7 +436,7 @@ struct JSResponseTests {
     expectNoDifference(resolvedValue?.objectForKeyedSubscript("foo").toString(), "bar")
     expectNoDifference(resolvedValue?.objectForKeyedSubscript("a").isNull, true)
   }
-
+  
   @Test("Response Clone Copies FormData")
   func copiesFormDataOnClone() async throws {
     let value = self.context
@@ -458,7 +458,7 @@ struct JSResponseTests {
     expectNoDifference(resolvedValue?.objectForKeyedSubscript("isSame").toBool(), false)
     expectNoDifference(resolvedValue?.objectForKeyedSubscript("a").isNull, true)
   }
-
+  
   @Test("Status OK When in 200 Range")
   func statusOk() {
     for i in 200..<300 {
@@ -466,7 +466,7 @@ struct JSResponseTests {
       expectNoDifference(value?.toBool(), true)
     }
   }
-
+  
   @Test("Status Not Ok When Not in 200 Range")
   func statusNotOk() {
     for i in 300..<600 {
@@ -474,48 +474,46 @@ struct JSResponseTests {
       expectNoDifference(value?.toBool(), false)
     }
   }
-
-  #if canImport(UniformTypeIdentifiers)
-    @Test(
-      "FormData Body Text",
-      arguments: [
-        "response.text()",
-        "response.blob().then((b) => b.text())",
-        "response.bytes().then((b) => _jsCoreExtrasUint8ArrayToString(b))"
-      ]
-    )
-    @available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
-    func formDataBodyText(text: String) async throws {
-      let url = URL.temporaryDirectory.appending(path: "\(UUID()).txt")
-      try "Hello world".write(to: url, atomically: true, encoding: .utf8)
-      let file = try JSFile(contentsOf: url)
-      self.context.setObject(file, forPath: "testFile")
-      let value = self.context
-        .evaluateScript(
-          """
-          function _jsCoreExtrasFormDataBoundary() {
-            return "-----testBoundary"
-          }
-
-          const formData = new FormData()
-          formData.set("file", testFile)
-          formData.append("a", "b")
-          formData.append("a", "c")
-          const response = new Response(formData)
-          \(text)
-          """
-        )
-        .toPromise()
-      let resolvedValue = try await value?.resolvedValue
-      expectNoDifference(
-        resolvedValue?.toString(),
+  
+  @Test(
+    "FormData Body Text",
+    arguments: [
+      "response.text()",
+      "response.blob().then((b) => b.text())",
+      "response.bytes().then((b) => _jsCoreExtrasUint8ArrayToString(b))"
+    ]
+  )
+  @available(iOS 16, macOS 13, tvOS 16, watchOS 9, *)
+  func formDataBodyText(text: String) async throws {
+    let url = URL.temporaryDirectory.appending(path: "\(UUID()).txt")
+    try "Hello world".write(to: url, atomically: true, encoding: .utf8)
+    let file = try JSFile(contentsOf: url)
+    self.context.setObject(file, forPath: "testFile")
+    let value = self.context
+      .evaluateScript(
+        """
+        function _jsCoreExtrasFormDataBoundary() {
+          return "-----testBoundary"
+        }
+        
+        const formData = new FormData()
+        formData.set("file", testFile)
+        formData.append("a", "b")
+        formData.append("a", "c")
+        const response = new Response(formData)
+        \(text)
+        """
+      )
+      .toPromise()
+    let resolvedValue = try await value?.resolvedValue
+    expectNoDifference(
+      resolvedValue?.toString(),
         """
         -----testBoundary\r\nContent-Disposition: form-data; name="file"; filename="\(file.name)"\r\nContent-Type: text/plain\r\n\r\nHello world\r\n-----testBoundary\r\nContent-Disposition: form-data; name="a"\r\n\r\nb\r\n-----testBoundary\r\nContent-Disposition: form-data; name="a"\r\n\r\nc\r\n-----testBoundary--\r\n
         """
-      )
-    }
-  #endif
-
+    )
+  }
+  
   @Test("Sets Content-Type Header to multipart/form-data When Body is FormData")
   func multipartFormData() {
     let value = self.context
@@ -529,7 +527,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toString(), "multipart/form-data; boundary=-----testBoundary")
   }
-
+  
   @Test(
     "Keeps Content-Type Header to Current Content-Type When Body is FormData But Content-Type Specified"
   )
@@ -549,7 +547,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toString(), "application/json")
   }
-
+  
   @Test(
     "Sets Content-Type Header to text/plain When Body is String",
     arguments: ["\"\"", "new String()", "1"]
@@ -563,7 +561,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toString(), "text/plain; charset=UTF-8")
   }
-
+  
   @Test("Sets Content-Type Header to Blob type When Body is Blob")
   func blobContentType() {
     let value = self.context
@@ -574,7 +572,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toString(), "application/json")
   }
-
+  
   @Test(
     "Cannot Create Redirect Response From Invalid Status Code",
     arguments: [500, 200, 300, 305, 310]
@@ -588,7 +586,7 @@ struct JSResponseTests {
       in: self.context
     )
   }
-
+  
   @Test("302 Status Code By Default for Redirect")
   func redirect302Code() {
     let value = self.context
@@ -599,7 +597,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toInt32(), 302)
   }
-
+  
   @Test("Allows 3XX Status Codes For Redirect", arguments: [301, 302, 303, 307, 308])
   func redirectStatusCodes(status: Int32) {
     let value = self.context
@@ -610,7 +608,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toInt32(), status)
   }
-
+  
   @Test("Invalid JSON Response")
   func invalidJSON() {
     expectErrorMessage(
@@ -619,7 +617,7 @@ struct JSResponseTests {
       in: self.context
     )
   }
-
+  
   @Test("Valid JSON Response")
   func validJSON() async throws {
     let value = self.context
@@ -637,7 +635,7 @@ struct JSResponseTests {
       """
     )
   }
-
+  
   @Test("JSON Response Uses application/json as the Content Type Header")
   func applicationJSON() async throws {
     let value = self.context
@@ -648,7 +646,7 @@ struct JSResponseTests {
       )
     expectNoDifference(value?.toString(), "application/json")
   }
-
+  
   @Test("JSON Response Does Not Override Predefined Content Type Header")
   func jsonDoesNotOverrideHeader() async throws {
     let value = self.context

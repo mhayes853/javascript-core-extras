@@ -371,7 +371,7 @@ struct JSRequestTests {
       )
       .toPromise()
     do {
-      try await value?.resolvedValue
+      _ = try await value?.resolvedValue
       reportIssue("Should reject")
     } catch {
       let error = try #require(error as? JSPromiseRejectedError)
