@@ -450,8 +450,6 @@ struct JSConsoleLoggerTests {
       self.logger.messages,
       [LogMessage(level: nil, message: "undefined")]
     )
-
-    print("hello world".components(separatedBy: " "))
   }
 
   @Test("Format as Non-First Arg, Does Not Output Formatted Log")

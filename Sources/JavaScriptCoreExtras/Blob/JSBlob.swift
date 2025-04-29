@@ -201,7 +201,6 @@ extension JSValue {
       let iteratorFunction = self.objectForKeyedSubscript(symbolIterator).call(withArguments: []),
       let iterator = iteratorFunction.call(withArguments: [])
     else { return [] }
-    print(iterator)
     var results: [String] = []
     while true {
       guard let result = iterator.invokeMethod("next", withArguments: []) else { break }
