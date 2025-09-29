@@ -708,8 +708,9 @@ struct JSFetchTests: @unchecked Sendable {
       .evaluateScript(
         """
         const request = async () => {
-          const resp = await fetch("https://link.testfile.org/15MB")
-          return { status: resp.status, text: await resp.text() }
+          const resp = await fetch("https://whypeople.xyz/text-files/15MB_file.txt")
+          const blob = await resp.blob()
+          return { status: resp.status, size: blob.size, text: await blob.text() }
         }
         request()
         """
@@ -717,6 +718,7 @@ struct JSFetchTests: @unchecked Sendable {
       .toPromise()
     let value = try await promise?.resolvedValue
     expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
+    expectNoDifference(value?.objectForKeyedSubscript("size").toInt32(), 15_728_640)
     let text = value?.objectForKeyedSubscript("text").toString()
     assertSnapshot(of: try #require(text), as: .lines)
   }
