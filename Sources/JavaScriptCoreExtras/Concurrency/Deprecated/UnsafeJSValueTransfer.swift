@@ -10,7 +10,7 @@ import JavaScriptCore
   *,
   deprecated,
   message:
-    "Make sure to only use JSValue instances on the same thread that their JSVirtualMachine was created on."
+    "Make sure to only use a JSValue/JSContext instance on the same thread that its JSVirtualMachine was created on."
 )
 public struct UnsafeJSValueTransfer: @unchecked Sendable {
   /// The `JSValue`.
