@@ -6,6 +6,12 @@ import JavaScriptCore
 /// is an open class that can be subclassed. Therefore, this type exists as an honorary mechanism
 /// to avoid Sendable errors with `JSValue`. Do not construct this type with a non-thread-safe
 /// `JSValue` subclass instance.
+@available(
+  *,
+  deprecated,
+  message:
+    "Make sure to only use JSValue instances on the same thread that their JSVirtualMachine was created on."
+)
 public struct UnsafeJSValueTransfer: @unchecked Sendable {
   /// The `JSValue`.
   public let value: JSValue
