@@ -2,8 +2,17 @@ import Foundation
 import JavaScriptCore
 
 public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
+  private struct State {
+    var runLoop: CFRunLoop?
+    var source: CFRunLoopSource?
+  }
+
   private let createVirtualMachine: @Sendable () -> JSVirtualMachine
-  private let runLoop = Lock<CFRunLoop?>(nil)
+  private let state = Lock<State>(State())
+
+  public var isRunning: Bool {
+    self.state.withLock { $0.runLoop != nil }
+  }
 
   public init(
     createVirtualMachine: @escaping @Sendable () -> JSVirtualMachine = { JSVirtualMachine() }
@@ -16,28 +25,51 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
   }
 
   public func runBlocking() {
-    self.runLoop.withLock { runLoop in
-      runLoop = CFRunLoopGetCurrent()
-      let source = CFRunLoopCreateEmptySource()
+    self.state.withLock { state in
+      state.runLoop = CFRunLoopGetCurrent()
+      state.source = CFRunLoopCreateEmptySource()
       JSVirtualMachine.threadLocal = self.createVirtualMachine()
-      CFRunLoopAddSource(runLoop, source, .defaultMode)
+      CFRunLoopAddSource(state.runLoop, state.source, .defaultMode)
     }
     CFRunLoopRun()
   }
 
-  public func run() async {
-    await withUnsafeContinuation { continuation in
-      Thread.detachNewThread {
-        self.runBlocking()
-        continuation.resume()
+  public func run() async throws {
+    let box = Lock<UnsafeContinuation<Void, any Error>?>(nil)
+    return try await withTaskCancellationHandler {
+      try await withUnsafeThrowingContinuation { continuation in
+        let isCancelled = box.withLock {
+          guard !Task.isCancelled else { return true }
+          $0 = continuation
+          return false
+        }
+        guard !isCancelled else {
+          return continuation.resume(throwing: CancellationError())
+        }
+        Thread.detachNewThread {
+          self.runBlocking()
+          box.withLock {
+            $0?.resume()
+            $0 = nil
+          }
+        }
+      }
+    } onCancel: {
+      self.stop()
+      box.withLock {
+        $0?.resume(throwing: CancellationError())
+        $0 = nil
       }
     }
   }
 
   public func stop() {
-    self.runLoop.withLock {
-      guard let runLoop = $0 else { return }
+    self.state.withLock { state in
+      guard let runLoop = state.runLoop, let source = state.source else { return }
+      CFRunLoopRemoveSource(runLoop, source, .defaultMode)
       CFRunLoopStop(runLoop)
+      state.runLoop = nil
+      state.source = nil
     }
   }
 
@@ -65,8 +97,8 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
   }
 
   private func schedule(_ work: @escaping @Sendable () -> Void) {
-    self.runLoop.withLock { runLoop in
-      guard let runLoop else { executorNotRunning() }
+    self.state.withLock { state in
+      guard let runLoop = state.runLoop else { executorNotRunning() }
       CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue, work)
       CFRunLoopWakeUp(runLoop)
     }

@@ -5,14 +5,14 @@ import Testing
 
 @Suite("JSVirtualMachineExecutorPool tests")
 struct JSVirtualMachineExecutorPoolTests {
-  @Test("Uses Same Virtual Machine For Contexts When Only 1 Machine Allowed")
+  @Test("Uses Same Virtual Machine When Only 1 Executor Allowed")
   func singleMachinePool() async {
     let pool = JSVirtualMachineExecutorPool(count: 1) { CustomVM() }
     let (m1, m2) = await (pool.executor(), pool.executor())
     await expectIdenticalVMs(m1, m2)
   }
 
-  @Test("Performs A Round Robin When Pool Has Multiple Virtual Machines")
+  @Test("Performs A Round Robin When Pool Has Multiple Executor")
   func roundRobin() async {
     let pool = JSVirtualMachineExecutorPool(count: 3) { CustomVM() }
     let (c1, c2, c3, c4) = await (
@@ -34,7 +34,14 @@ struct JSVirtualMachineExecutorPoolTests {
     await e1.withVirtualMachine { expectNoDifference($0 is CustomVM, true) }
   }
 
-  @Test("Allows Concurrent Execution With Separate Virtual Machines")
+  @Test("Executor Is Running When Retrieved")
+  func executorIsRunningWhenRetrieved() async {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let executor = await pool.executor()
+    expectNoDifference(executor.isRunning, true)
+  }
+
+  @Test("Allows Concurrent Execution With Separate Executors")
   func concurrentExecution() async {
     let pool = JSVirtualMachineExecutorPool(count: 2)
     let (e1, e2) = await (pool.executor(), pool.executor())
@@ -86,7 +93,7 @@ struct JSVirtualMachineExecutorPoolTests {
     }
   }
 
-  @Test("Does Not Create More Threads Than Machines")
+  @Test("Does Not Create More Threads Than Executors")
   func doesNotCreateMoreThreadsThanMachines() async {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     await withTaskGroup { group in
@@ -134,6 +141,15 @@ struct JSVirtualMachineExecutorPoolTests {
 
     let e3 = await pool.executor()
     expectNoDifference(e1 === e3, true)
+  }
+
+  @Test("Executor Stops Running When Garbage Collected")
+  func executorStopsRunningWhenGarbageCollected() async {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let executor = await pool.executor()
+    pool.release(executor: executor)
+    pool.garbageCollect()
+    expectNoDifference(executor.isRunning, false)
   }
 }
 
