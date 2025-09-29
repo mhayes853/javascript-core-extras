@@ -127,12 +127,15 @@ extension JSFetchTask: JSFetchTaskExport {
 
 private final class JSURLSessionDataDelegate: NSObject {
   typealias TaskID = Int
-  private typealias State = (
-    body: JSFetchResponseBlobStorage?,
-    cancelReason: JSValue?,
-    didRedirect: Bool,
-    continuation: JSPromise.Continuation?
-  )
+
+  private struct State {
+    var didResolveResponse = false
+    var bodyCollector = BodyCollector()
+    var cancelReason: JSValue?
+    var didRedirect = false
+    var continuation: JSPromise.Continuation?
+    var response: HTTPURLResponse?
+  }
 
   let isShared: Bool
   private let state = Lock([TaskID: State]())
@@ -180,22 +183,19 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
         )
         return
       }
-      let storage = JSFetchResponseBlobStorage(contentLength: response.expectedContentLength)
-      let (cookies, headers) = response.cookieFilteredHeaders
+      let (cookies, _) = response.cookieFilteredHeaders
       if dataTask.currentRequest?.httpShouldHandleCookies == true {
         session.configuration.httpCookieStorage?
           .setCookies(cookies, for: response.url, mainDocumentURL: response.url)
       }
-      continuation.resume(
-        resolving: JSValue.response(
-          response: response,
-          headers: headers,
-          body: storage,
-          didRedirect: state.didRedirect,
-          in: continuation.context
-        )
+      state.response = response
+      guard response.expectedContentLength != -1 else { return }
+
+      let storage = JSFetchResponseBlobStorage.deferred(
+        contentLength: response.expectedContentLength,
+        collector: state.bodyCollector
       )
-      state.body = storage
+      self.resolveResponse(in: &state, using: storage)
     }
     completionHandler(.allow)
   }
@@ -212,7 +212,7 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-    self.editState(for: dataTask.taskIdentifier) { $0.body?.resume(with: data) }
+    self.editState(for: dataTask.taskIdentifier) { $0.bodyCollector.push(data: data) }
   }
 
   func urlSession(
@@ -221,19 +221,59 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
     didCompleteWithError error: (any Error)?
   ) {
     self.editState(for: task.taskIdentifier) { state in
-      state.body?.finish(with: error)
-      guard let continuation = state.continuation, let error else { return }
-      if let error = error as? URLError, error.code == .cancelled {
-        continuation.resume(rejecting: state.cancelReason)
+      state.bodyCollector.finish(with: error)
+      guard !state.didResolveResponse else { return }
+      if let error {
+        self.resolveError(in: &state, error: error)
       } else {
-        continuation.resume(
-          rejecting: JSValue(
-            newErrorFromMessage: error.localizedDescription,
-            in: continuation.context
-          )
-        )
+        Task { await self.resolveResponse(task: task) }
       }
     }
+  }
+
+  private func resolveError(in state: inout State, error: any Error) {
+    guard let continuation = state.continuation else { return }
+    if let error = error as? URLError, error.code == .cancelled {
+      continuation.resume(rejecting: state.cancelReason)
+    } else {
+      continuation.resume(
+        rejecting: JSValue(
+          newErrorFromMessage: error.localizedDescription,
+          in: continuation.context
+        )
+      )
+    }
+    state.didResolveResponse = true
+  }
+
+  private func resolveResponse(task: URLSessionTask) async {
+    do {
+      let collector = self.editState(for: task.taskIdentifier) { $0.bodyCollector }
+      let storage = try await JSFetchResponseBlobStorage(collector: collector)
+      self.editState(for: task.taskIdentifier) { self.resolveResponse(in: &$0, using: storage) }
+    } catch {
+      self.editState(for: task.taskIdentifier) {
+        self.resolveError(in: &$0, error: error)
+      }
+    }
+  }
+
+  private func resolveResponse(
+    in state: inout State,
+    using storage: JSFetchResponseBlobStorage
+  ) {
+    guard let response = state.response, let continuation = state.continuation else { return }
+    let (_, headers) = response.cookieFilteredHeaders
+    continuation.resume(
+      resolving: JSValue.response(
+        response: response,
+        headers: headers,
+        body: storage,
+        didRedirect: state.didRedirect,
+        in: continuation.context
+      )
+    )
+    state.didResolveResponse = true
   }
 }
 
@@ -242,34 +282,46 @@ extension JSURLSessionDataDelegate {
     for taskId: TaskID,
     operation: @Sendable (inout State) -> T
   ) -> T {
-    self.state.withLock { operation(&$0[taskId, default: (nil, nil, false, nil)]) }
+    self.state.withLock { operation(&$0[taskId, default: State()]) }
   }
 }
 
 // MARK: - Response Blob Storage
 
-private final class JSFetchResponseBlobStorage {
-  private let stream: AsyncThrowingStream<Data, any Error>
-  private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
-  let utf8SizeInBytes: Int64
-
-  init(contentLength: Int64) {
-    let (stream, continuation) = AsyncThrowingStream<Data, any Error>.makeStream()
-    self.utf8SizeInBytes = contentLength
-    self.stream = stream
-    self.continuation = continuation
+private final class JSFetchResponseBlobStorage: JSBlobStorage {
+  private enum DataStorage {
+    case deferred(BodyCollector, size: Int64)
+    case provided(String)
   }
-}
 
-extension JSFetchResponseBlobStorage: JSBlobStorage {
+  private let storage: DataStorage
+
+  var utf8SizeInBytes: Int64 {
+    switch self.storage {
+    case .deferred(_, let size): size
+    case .provided(let data): Int64(data.count)
+    }
+  }
+
+  static func deferred(contentLength: Int64, collector: BodyCollector) -> Self {
+    Self(storage: .deferred(collector, size: contentLength))
+  }
+
+  convenience init(collector: BodyCollector) async throws {
+    self.init(storage: .provided(try await collector.collect()))
+  }
+
+  private init(storage: DataStorage) {
+    self.storage = storage
+  }
+
   func utf8Bytes(
     startIndex: Int64,
     endIndex: Int64,
     context: JSContext
   ) async throws(JSValueError) -> String.UTF8View {
     do {
-      let utf8 = try await self.stream.reduce(into: Data()) { $0.append($1) }
-      return String(decoding: utf8, as: UTF8.self)
+      return try await self.data()
         .utf8Bytes(startIndex: startIndex, endIndex: endIndex, context: context)
     } catch {
       throw JSValueError(
@@ -277,10 +329,33 @@ extension JSFetchResponseBlobStorage: JSBlobStorage {
       )
     }
   }
+
+  private func data() async throws -> String {
+    switch storage {
+    case .deferred(let collector, _): try await collector.collect()
+    case .provided(let data): data
+    }
+  }
 }
 
-extension JSFetchResponseBlobStorage {
-  func resume(with data: Data) {
+// MARK: - BodyCollector
+
+private final class BodyCollector: Sendable {
+  private let stream: AsyncThrowingStream<Data, any Error>
+  private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
+
+  init() {
+    let (stream, continuation) = AsyncThrowingStream<Data, any Error>.makeStream()
+    self.stream = stream
+    self.continuation = continuation
+  }
+
+  func collect() async throws -> String {
+    let data = try await self.stream.reduce(into: Data()) { $0.append($1) }
+    return String(decoding: data, as: UTF8.self)
+  }
+
+  func push(data: Data) {
     self.continuation.yield(data)
   }
 

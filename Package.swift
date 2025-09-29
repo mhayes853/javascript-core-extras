@@ -40,6 +40,7 @@ let package = Package(
         .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+        .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay"),
         .product(name: "CustomDump", package: "swift-custom-dump")
       ]
     ),
