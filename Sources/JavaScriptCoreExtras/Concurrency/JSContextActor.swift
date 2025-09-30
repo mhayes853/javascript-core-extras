@@ -20,7 +20,8 @@ public final actor JSContextActor {
   }
 
   private func newContext() -> JSContext {
-    guard let vm = JSVirtualMachine.threadLocal else { executorNotRunning() }
-    return JSContext(virtualMachine: vm)
+    let context = self.executor.withVirtualMachineIfAvailable { JSContext(virtualMachine: $0)! }
+    guard let context else { executorNotRunning() }
+    return context
   }
 }

@@ -94,8 +94,8 @@ public final class JSVirtualMachineExecutor: Sendable {
   }
 
   public func withVirtualMachineIfAvailable<T, E: Error>(
-    perform operation: (JSVirtualMachine) throws(E) -> sending T
-  ) throws(E) -> sending T? {
+    perform operation: (JSVirtualMachine) throws(E) -> T
+  ) throws(E) -> T? {
     try self.state.withLock { state throws(E) in
       guard let vm = JSVirtualMachine.threadLocal, state.runningThread == .current else {
         return nil
