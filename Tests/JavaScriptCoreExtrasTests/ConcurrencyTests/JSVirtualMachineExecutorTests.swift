@@ -49,6 +49,42 @@ struct JSVirtualMachineExecutorTests {
       try await task.value
     }
   }
+
+  @Test("Has Virtual Machine When Running On Same Thread")
+  func hasVirtualMachineWhenRunningOnSameThread() async {
+    let executor = JSVirtualMachineExecutor()
+    Task { try await executor.run() }
+    await Task.megaYield()
+    let value = await executor.withVirtualMachine { _ in
+      executor.withVirtualMachineIfAvailable { _ in () }
+    }
+    expectNoDifference(value != nil, true)
+  }
+
+  @Test("Has No Virtual Machine When Not Running On Same Thread")
+  func hasNoVirtualMachineWhenNotRunningOnSameThread() async {
+    let executor = JSVirtualMachineExecutor()
+    Task { try await executor.run() }
+    await Task.megaYield()
+    let value = executor.withVirtualMachineIfAvailable { _ in () }
+    expectNoDifference(value != nil, false)
+  }
+
+  @Test("Has No Virtual Machine When Not Using The Right Virtual Machine For Executor")
+  func hasNoVirtualMachineWhenNotUsingTheRightVirtualMachineForExecutor() async {
+    let e1 = JSVirtualMachineExecutor()
+    let e2 = JSVirtualMachineExecutor()
+
+    Task { try await e1.run() }
+    Task { try await e2.run() }
+    await Task.megaYield()
+    await Task.megaYield()
+
+    let value = await e1.withVirtualMachine { _ in
+      e2.withVirtualMachineIfAvailable { _ in () }
+    }
+    expectNoDifference(value != nil, false)
+  }
 }
 
 final class JSVirtualMachineExecutorXCTests: XCTestCase {

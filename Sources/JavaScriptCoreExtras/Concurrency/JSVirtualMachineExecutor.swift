@@ -5,6 +5,7 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
   private struct State {
     var runLoop: CFRunLoop?
     var source: CFRunLoopSource?
+    var runningThread: Thread?
   }
 
   private let createVirtualMachine: @Sendable () -> JSVirtualMachine
@@ -28,6 +29,7 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
     self.state.withLock { state in
       state.runLoop = CFRunLoopGetCurrent()
       state.source = CFRunLoopCreateEmptySource()
+      state.runningThread = .current
       JSVirtualMachine.threadLocal = self.createVirtualMachine()
       CFRunLoopAddSource(state.runLoop, state.source, .defaultMode)
     }
@@ -70,6 +72,7 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
       CFRunLoopStop(runLoop)
       state.runLoop = nil
       state.source = nil
+      state.runningThread = nil
     }
   }
 
@@ -86,6 +89,17 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
       }
     }
     return try result.get()
+  }
+
+  public func withVirtualMachineIfAvailable<T, E: Error>(
+    perform operation: (JSVirtualMachine) throws(E) -> sending T
+  ) throws(E) -> sending T? {
+    try self.state.withLock { state throws(E) in
+      guard let vm = JSVirtualMachine.threadLocal, state.runningThread == .current else {
+        return nil
+      }
+      return try operation(vm)
+    }
   }
 
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
