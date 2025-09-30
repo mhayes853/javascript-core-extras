@@ -1,7 +1,9 @@
 import Foundation
 import JavaScriptCore
 
-public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
+// MARK: - JSVirtualMachineExecutor
+
+public final class JSVirtualMachineExecutor: Sendable {
   private struct State {
     var runLoop: CFRunLoop?
     var source: CFRunLoopSource?
@@ -102,14 +104,6 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
     }
   }
 
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
-  }
-
-  public func enqueue(_ job: UnownedJob) {
-    self.schedule { job.runSynchronously(on: self.asUnownedSerialExecutor()) }
-  }
-
   private func schedule(_ work: @escaping @Sendable () -> Void) {
     self.state.withLock { state in
       guard let runLoop = state.runLoop else { executorNotRunning() }
@@ -118,6 +112,29 @@ public final class JSVirtualMachineExecutor: Sendable, SerialExecutor {
     }
   }
 }
+
+// MARK: - SerialExecutor
+
+extension JSVirtualMachineExecutor: SerialExecutor {
+  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+
+  public func enqueue(_ job: UnownedJob) {
+    self.schedule { job.runSynchronously(on: self.asUnownedSerialExecutor()) }
+  }
+}
+
+// MARK: - TaskExecutor
+
+@available(iOS 18.0, macOS 15.0, tvOS 18.0, visionOS 2.0, *)
+extension JSVirtualMachineExecutor: TaskExecutor {
+  public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
+    UnownedTaskExecutor(ordinary: self)
+  }
+}
+
+// MARK: - Helpers
 
 func executorNotRunning() -> Never {
   fatalError("Executor is not running. Call `run` or `runBlocking` to start it.")
