@@ -92,6 +92,21 @@ extension JSVirtualMachineExecutor {
   }
 }
 
+// MARK: - JSContextActor Creation
+
+extension JSVirtualMachineExecutor {
+  public func contextActor() async -> JSContextActor {
+    await self.withVirtualMachine { _ in
+      // NB: Guaranteed to be non-nil because the virtual machine is available.
+      JSContextActor(executor: self)!
+    }
+  }
+
+  public func contextActorIfAvailable() -> JSContextActor? {
+    JSContextActor(executor: self)
+  }
+}
+
 // MARK: - VirtualMachine Access
 
 extension JSVirtualMachineExecutor {
@@ -196,6 +211,6 @@ private func CFRunLoopCreateEmptySource() -> CFRunLoopSource {
 
 // MARK: - Helpers
 
-func executorNotRunning() -> Never {
+private func executorNotRunning() -> Never {
   fatalError("Executor is not running. Call `run` or `runBlocking` to start it.")
 }

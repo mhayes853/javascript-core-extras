@@ -91,27 +91,23 @@ struct JSVirtualMachineExecutorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
 
-    await confirmation { confirm in
-      await e.withVirtualMachine { vm in
-        let context = JSContext(virtualMachine: vm)
+    await e.withVirtualMachine { vm in
+      let context = JSContext(virtualMachine: vm)
 
-        let block: @convention(block) () -> Void = {
-          let value: Void? = e.withVirtualMachineIfAvailable { _ in () }
-          expectNoDifference(value != nil, false)
-          confirm()
-        }
-        context?.setObject(block, forPath: "block")
-        context?.evaluateScript("block()")
+      let block: @convention(block) () -> Bool = {
+        let value: Void? = e.withVirtualMachineIfAvailable { _ in () }
+        return value != nil
       }
+      context?.setObject(block, forPath: "block")
+      let value = context?.evaluateScript("block()")
+      expectNoDifference(value?.toBool(), true)
     }
   }
 
   @Test("Current Executor Is Nil When Not Running")
   func currentExecutorIsNilWhenNotRunning() async {
     let e = JSVirtualMachineExecutor()
-    await confirmation { confirm in
-      self.expectCurrentExecutorMatch(with: nil, context: JSContext(), confirmation: confirm)
-    }
+    self.expectCurrentExecutorMatch(with: nil, context: JSContext())
     _ = e
   }
 
@@ -120,9 +116,7 @@ struct JSVirtualMachineExecutorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
     e.stop()
-    await confirmation { confirm in
-      self.expectCurrentExecutorMatch(with: nil, context: JSContext(), confirmation: confirm)
-    }
+    self.expectCurrentExecutorMatch(with: nil, context: JSContext())
     _ = e
   }
 
@@ -131,14 +125,8 @@ struct JSVirtualMachineExecutorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
 
-    await confirmation { confirm in
-      await e.withVirtualMachine { vm in
-        self.expectCurrentExecutorMatch(
-          with: e,
-          context: JSContext(virtualMachine: vm),
-          confirmation: confirm
-        )
-      }
+    await e.withVirtualMachine { vm in
+      self.expectCurrentExecutorMatch(with: e, context: JSContext(virtualMachine: vm))
     }
   }
 
@@ -148,37 +136,24 @@ struct JSVirtualMachineExecutorTests {
     let e1 = await pool.executor()
     let e2 = await pool.executor()
 
-    await confirmation { confirm in
-      await e1.withVirtualMachine { vm in
-        self.expectCurrentExecutorMatch(
-          with: e1,
-          context: JSContext(virtualMachine: vm),
-          confirmation: confirm
-        )
-      }
+    await e1.withVirtualMachine { vm in
+      self.expectCurrentExecutorMatch(with: e1, context: JSContext(virtualMachine: vm))
     }
-    await confirmation { confirm in
-      await e2.withVirtualMachine { vm in
-        self.expectCurrentExecutorMatch(
-          with: e2,
-          context: JSContext(virtualMachine: vm),
-          confirmation: confirm
-        )
-      }
+    await e2.withVirtualMachine { vm in
+      self.expectCurrentExecutorMatch(with: e2, context: JSContext(virtualMachine: vm))
     }
   }
 
   private func expectCurrentExecutorMatch(
     with executor: JSVirtualMachineExecutor?,
-    context: JSContext?,
-    confirmation: Confirmation
+    context: JSContext?
   ) {
-    let block: @convention(block) () -> Void = {
-      expectNoDifference(JSVirtualMachineExecutor.current() === executor, true)
-      confirmation()
+    let block: @convention(block) () -> Bool = {
+      JSVirtualMachineExecutor.current() === executor
     }
     context?.setObject(block, forPath: "block")
-    context?.evaluateScript("block()")
+    let value = context?.evaluateScript("block()")
+    expectNoDifference(value?.toBool(), true)
   }
 }
 

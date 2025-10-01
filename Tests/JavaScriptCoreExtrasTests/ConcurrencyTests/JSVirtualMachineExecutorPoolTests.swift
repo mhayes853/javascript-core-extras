@@ -42,10 +42,10 @@ struct JSVirtualMachineExecutorPoolTests {
   }
 
   @Test("Allows Concurrent Execution With Separate Executors")
-  func concurrentExecution() async {
+  func concurrentExecution() async throws {
     let pool = JSVirtualMachineExecutorPool(count: 2)
     let (e1, e2) = await (pool.executor(), pool.executor())
-    let (c1, c2) = (JSContextActor(executor: e1), JSContextActor(executor: e2))
+    let (c1, c2) = await (e1.contextActor(), e2.contextActor())
 
     let ids = Lock([String]())
     let update: @convention(block) @Sendable (String) -> Void = { id in
