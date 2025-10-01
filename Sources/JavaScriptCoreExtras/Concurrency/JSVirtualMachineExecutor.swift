@@ -4,18 +4,8 @@ import JavaScriptCore
 // MARK: - JSVirtualMachineExecutor
 
 public final class JSVirtualMachineExecutor: Sendable {
-  private struct State {
-    var runLoop: CFRunLoop?
-    var source: CFRunLoopSource?
-    var runningThread: Thread?
-  }
-
   private let createVirtualMachine: @Sendable () -> JSVirtualMachine
-  private let state = Lock<State>(State())
-
-  public var isRunning: Bool {
-    self.state.withLock { $0.runLoop != nil }
-  }
+  private let runner = RecursiveLock<Runner?>(nil)
 
   public init(
     createVirtualMachine: @escaping @Sendable () -> JSVirtualMachine = { JSVirtualMachine() }
@@ -26,14 +16,39 @@ public final class JSVirtualMachineExecutor: Sendable {
   deinit {
     self.stop()
   }
+}
+
+// MARK: - Current
+
+extension JSVirtualMachineExecutor {
+  public static func current() -> JSVirtualMachineExecutor? {
+    Self.threadLocal?.value
+  }
+
+  private static let threadLocalKey = "__jsCoreExtrasThreadLocalVirtualMachineExecutor__"
+
+  private static var threadLocal: WeakBox<JSVirtualMachineExecutor>? {
+    get {
+      Thread.current.threadDictionary[Self.threadLocalKey] as? WeakBox<JSVirtualMachineExecutor>
+    }
+    set {
+      Thread.current.threadDictionary[Self.threadLocalKey] = newValue
+    }
+  }
+}
+
+// MARK: - Running
+
+extension JSVirtualMachineExecutor {
+  public var isRunning: Bool {
+    self.runner.withLock { $0 != nil }
+  }
 
   public func runBlocking() {
-    self.state.withLock { state in
-      state.runLoop = CFRunLoopGetCurrent()
-      state.source = CFRunLoopCreateEmptySource()
-      state.runningThread = .current
+    self.runner.withLock {
+      $0 = Runner()
+      Self.threadLocal = WeakBox(value: self)
       JSVirtualMachine.threadLocal = self.createVirtualMachine()
-      CFRunLoopAddSource(state.runLoop, state.source, .defaultMode)
     }
     CFRunLoopRun()
   }
@@ -68,16 +83,18 @@ public final class JSVirtualMachineExecutor: Sendable {
   }
 
   public func stop() {
-    self.state.withLock { state in
-      guard let runLoop = state.runLoop, let source = state.source else { return }
-      CFRunLoopRemoveSource(runLoop, source, .defaultMode)
-      CFRunLoopStop(runLoop)
-      state.runLoop = nil
-      state.source = nil
-      state.runningThread = nil
+    self.runner.withLock { runner in
+      runner?.stop()
+      runner = nil
+      Self.threadLocal = nil
+      JSVirtualMachine.threadLocal = nil
     }
   }
+}
 
+// MARK: - VirtualMachine Access
+
+extension JSVirtualMachineExecutor {
   public func withVirtualMachine<T, E: Error>(
     perform operation: @escaping @Sendable (JSVirtualMachine) throws(E) -> sending T
   ) async throws(E) -> sending T {
@@ -96,19 +113,12 @@ public final class JSVirtualMachineExecutor: Sendable {
   public func withVirtualMachineIfAvailable<T, E: Error>(
     perform operation: (JSVirtualMachine) throws(E) -> T
   ) throws(E) -> T? {
-    try self.state.withLock { state throws(E) in
-      guard let vm = JSVirtualMachine.threadLocal, state.runningThread == .current else {
+    try self.runner.withLock { runner throws(E) in
+      guard let runner else { executorNotRunning() }
+      guard let vm = JSVirtualMachine.threadLocal, runner.runningThread == .current else {
         return nil
       }
       return try operation(vm)
-    }
-  }
-
-  private func schedule(_ work: @escaping @Sendable () -> Void) {
-    self.state.withLock { state in
-      guard let runLoop = state.runLoop else { executorNotRunning() }
-      CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue, work)
-      CFRunLoopWakeUp(runLoop)
     }
   }
 }
@@ -123,6 +133,13 @@ extension JSVirtualMachineExecutor: SerialExecutor {
   public func enqueue(_ job: UnownedJob) {
     self.schedule { job.runSynchronously(on: self.asUnownedSerialExecutor()) }
   }
+
+  private func schedule(_ work: @escaping @Sendable () -> Void) {
+    self.runner.withLock { runner in
+      guard let runner else { executorNotRunning() }
+      runner.schedule(work)
+    }
+  }
 }
 
 // MARK: - TaskExecutor
@@ -134,10 +151,31 @@ extension JSVirtualMachineExecutor: TaskExecutor {
   }
 }
 
-// MARK: - Helpers
+// MARK: - Runnner
 
-func executorNotRunning() -> Never {
-  fatalError("Executor is not running. Call `run` or `runBlocking` to start it.")
+extension JSVirtualMachineExecutor {
+  private final class Runner {
+    private let runLoop: CFRunLoop
+    private let source: CFRunLoopSource
+    let runningThread: Thread
+
+    init() {
+      self.runLoop = CFRunLoopGetCurrent()
+      self.source = CFRunLoopCreateEmptySource()
+      self.runningThread = .current
+      CFRunLoopAddSource(self.runLoop, self.source, .defaultMode)
+    }
+
+    func stop() {
+      CFRunLoopRemoveSource(self.runLoop, self.source, .defaultMode)
+      CFRunLoopStop(self.runLoop)
+    }
+
+    func schedule(_ work: @escaping @Sendable () -> Void) {
+      CFRunLoopPerformBlock(self.runLoop, CFRunLoopMode.defaultMode.rawValue, work)
+      CFRunLoopWakeUp(self.runLoop)
+    }
+  }
 }
 
 private func CFRunLoopCreateEmptySource() -> CFRunLoopSource {
@@ -154,4 +192,10 @@ private func CFRunLoopCreateEmptySource() -> CFRunLoopSource {
     perform: { _ in }
   )
   return CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &sourceContext)!
+}
+
+// MARK: - Helpers
+
+func executorNotRunning() -> Never {
+  fatalError("Executor is not running. Call `run` or `runBlocking` to start it.")
 }

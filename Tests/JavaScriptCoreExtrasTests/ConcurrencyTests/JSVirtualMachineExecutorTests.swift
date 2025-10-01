@@ -55,7 +55,7 @@ struct JSVirtualMachineExecutorTests {
     let executor = JSVirtualMachineExecutor()
     Task { try await executor.run() }
     await Task.megaYield()
-    let value = await executor.withVirtualMachine { _ in
+    let value: Void? = await executor.withVirtualMachine { _ in
       executor.withVirtualMachineIfAvailable { _ in () }
     }
     expectNoDifference(value != nil, true)
@@ -66,7 +66,7 @@ struct JSVirtualMachineExecutorTests {
     let executor = JSVirtualMachineExecutor()
     Task { try await executor.run() }
     await Task.megaYield()
-    let value = executor.withVirtualMachineIfAvailable { _ in () }
+    let value: Void? = executor.withVirtualMachineIfAvailable { _ in () }
     expectNoDifference(value != nil, false)
   }
 
@@ -80,10 +80,105 @@ struct JSVirtualMachineExecutorTests {
     await Task.megaYield()
     await Task.megaYield()
 
-    let value = await e1.withVirtualMachine { _ in
+    let value: Void? = await e1.withVirtualMachine { _ in
       e2.withVirtualMachineIfAvailable { _ in () }
     }
     expectNoDifference(value != nil, false)
+  }
+
+  @Test("Virtual Machine Is Available From Within JS Function Call")
+  func virtualMachineIsAvailableFromWithinJSFunctionCall() async {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let e = await pool.executor()
+
+    await confirmation { confirm in
+      await e.withVirtualMachine { vm in
+        let context = JSContext(virtualMachine: vm)
+
+        let block: @convention(block) () -> Void = {
+          let value: Void? = e.withVirtualMachineIfAvailable { _ in () }
+          expectNoDifference(value != nil, false)
+          confirm()
+        }
+        context?.setObject(block, forPath: "block")
+        context?.evaluateScript("block()")
+      }
+    }
+  }
+
+  @Test("Current Executor Is Nil When Not Running")
+  func currentExecutorIsNilWhenNotRunning() async {
+    let e = JSVirtualMachineExecutor()
+    await confirmation { confirm in
+      self.expectCurrentExecutorMatch(with: nil, context: JSContext(), confirmation: confirm)
+    }
+    _ = e
+  }
+
+  @Test("Current Executor Is Nil When Stopped")
+  func currentExecutorIsNilWhenStopped() async {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let e = await pool.executor()
+    e.stop()
+    await confirmation { confirm in
+      self.expectCurrentExecutorMatch(with: nil, context: JSContext(), confirmation: confirm)
+    }
+    _ = e
+  }
+
+  @Test("Current Executor Matches Running Executor")
+  func currentExecutorMatchesRunningExecutor() async {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let e = await pool.executor()
+
+    await confirmation { confirm in
+      await e.withVirtualMachine { vm in
+        self.expectCurrentExecutorMatch(
+          with: e,
+          context: JSContext(virtualMachine: vm),
+          confirmation: confirm
+        )
+      }
+    }
+  }
+
+  @Test("Isolates Executors To Different Virtual Machines")
+  func isolatesExecutorsToDifferentVirtualMachines() async {
+    let pool = JSVirtualMachineExecutorPool(count: 2)
+    let e1 = await pool.executor()
+    let e2 = await pool.executor()
+
+    await confirmation { confirm in
+      await e1.withVirtualMachine { vm in
+        self.expectCurrentExecutorMatch(
+          with: e1,
+          context: JSContext(virtualMachine: vm),
+          confirmation: confirm
+        )
+      }
+    }
+    await confirmation { confirm in
+      await e2.withVirtualMachine { vm in
+        self.expectCurrentExecutorMatch(
+          with: e2,
+          context: JSContext(virtualMachine: vm),
+          confirmation: confirm
+        )
+      }
+    }
+  }
+
+  private func expectCurrentExecutorMatch(
+    with executor: JSVirtualMachineExecutor?,
+    context: JSContext?,
+    confirmation: Confirmation
+  ) {
+    let block: @convention(block) () -> Void = {
+      expectNoDifference(JSVirtualMachineExecutor.current() === executor, true)
+      confirmation()
+    }
+    context?.setObject(block, forPath: "block")
+    context?.evaluateScript("block()")
   }
 }
 
