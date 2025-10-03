@@ -27,9 +27,9 @@ public final actor JSContextActor {
     self.executor = executor
   }
 
-  public func withContext<T, E: Error>(
-    perform operation: (isolated JSContextActor, JSContext) throws(E) -> sending T
+  public func withIsolation<T, E: Error>(
+    perform operation: (isolated JSContextActor) throws(E) -> sending T
   ) throws(E) -> sending T {
-    try operation(self, self.context)
+    try operation(self)
   }
 }

@@ -30,8 +30,8 @@ struct JSContextActorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
     let context = await e.contextActor()
-    await context.withContext { @Sendable _, context in
-      let value = context.evaluateScript("1 === 2")
+    await context.withIsolation { @Sendable in
+      let value = $0.context.evaluateScript("1 === 2")
       expectNoDifference(value?.toBool(), false)
     }
   }
@@ -55,7 +55,7 @@ struct JSContextActorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
     let context = await e.contextActor()
-    await context.withContext { @Sendable _, _ in
+    await context.withIsolation { @Sendable _ in
       expectNoDifference(JSContextActor.currentForJSInvoke() == nil, true)
     }
   }
@@ -65,10 +65,10 @@ struct JSContextActorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
     let context = await e.contextActor()
-    await context.withContext { @Sendable _, context in
+    await context.withIsolation { @Sendable in
       let block: @convention(block) () -> Bool = { JSContextActor.currentForJSInvoke() == nil }
-      context.setObject(block, forPath: "block")
-      let value = context.evaluateScript("block()")
+      $0.context.setObject(block, forPath: "block")
+      let value = $0.context.evaluateScript("block()")
       expectNoDifference(value?.toBool(), false)
     }
   }
