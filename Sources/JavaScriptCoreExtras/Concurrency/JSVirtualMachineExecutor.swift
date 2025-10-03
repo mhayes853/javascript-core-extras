@@ -129,8 +129,11 @@ extension JSVirtualMachineExecutor {
     perform operation: (JSVirtualMachine) throws(E) -> T
   ) throws(E) -> T? {
     try self.runner.withLock { runner throws(E) in
-      guard let runner else { executorNotRunning() }
-      guard let vm = JSVirtualMachine.threadLocal, runner.runningThread == .current else {
+      guard runner != nil else { executorNotRunning() }
+      guard
+        let vm = JSVirtualMachine.threadLocal,
+        self === JSVirtualMachineExecutor.current()
+      else {
         return nil
       }
       return try operation(vm)

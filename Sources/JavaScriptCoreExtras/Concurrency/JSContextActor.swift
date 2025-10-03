@@ -20,11 +20,11 @@ public final actor JSContextActor {
     executor: JSVirtualMachineExecutor,
     createContext: (JSVirtualMachine) -> JSContext = { JSContext(virtualMachine: $0) }
   ) {
-    guard let vm = executor.withVirtualMachineIfCurrentExecutor(perform: { $0 }) else {
-      return nil
+    let context = executor.withVirtualMachineIfCurrentExecutor { vm in
+      let context = createContext(vm)
+      return context.virtualMachine == vm ? context : nil
     }
-    let context = createContext(vm)
-    guard context.virtualMachine === vm else { return nil }
+    guard case .some(let context?) = context else { return nil }
     self.context = context
     self.executor = executor
   }
