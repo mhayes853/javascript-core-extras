@@ -56,7 +56,7 @@ struct JSVirtualMachineExecutorTests {
     Task { try await executor.run() }
     await Task.megaYield()
     let value: Void? = await executor.withVirtualMachine { _ in
-      executor.withVirtualMachineIfAvailable { _ in () }
+      executor.withVirtualMachineIfCurrentExecutor { _ in () }
     }
     expectNoDifference(value != nil, true)
   }
@@ -66,7 +66,7 @@ struct JSVirtualMachineExecutorTests {
     let executor = JSVirtualMachineExecutor()
     Task { try await executor.run() }
     await Task.megaYield()
-    let value: Void? = executor.withVirtualMachineIfAvailable { _ in () }
+    let value: Void? = executor.withVirtualMachineIfCurrentExecutor { _ in () }
     expectNoDifference(value != nil, false)
   }
 
@@ -81,7 +81,7 @@ struct JSVirtualMachineExecutorTests {
     await Task.megaYield()
 
     let value: Void? = await e1.withVirtualMachine { _ in
-      e2.withVirtualMachineIfAvailable { _ in () }
+      e2.withVirtualMachineIfCurrentExecutor { _ in () }
     }
     expectNoDifference(value != nil, false)
   }
@@ -95,7 +95,7 @@ struct JSVirtualMachineExecutorTests {
       let context = JSContext(virtualMachine: vm)
 
       let block: @convention(block) () -> Bool = {
-        let value: Void? = e.withVirtualMachineIfAvailable { _ in () }
+        let value: Void? = e.withVirtualMachineIfCurrentExecutor { _ in () }
         return value != nil
       }
       context?.setObject(block, forPath: "block")

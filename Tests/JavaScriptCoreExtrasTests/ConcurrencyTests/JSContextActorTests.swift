@@ -9,7 +9,7 @@ struct JSContextActorTests {
     let pool = JSVirtualMachineExecutorPool(count: 1)
     let e = await pool.executor()
     await Task {
-      expectNoDifference(e.withVirtualMachineIfAvailable { _ in () } == nil, true)
+      expectNoDifference(e.withVirtualMachineIfCurrentExecutor { _ in () } == nil, true)
       expectNoDifference(JSContextActor(executor: e) == nil, true)
     }
     .value

@@ -125,7 +125,7 @@ extension JSVirtualMachineExecutor {
     return try result.get()
   }
 
-  public func withVirtualMachineIfAvailable<T, E: Error>(
+  public func withVirtualMachineIfCurrentExecutor<T, E: Error>(
     perform operation: (JSVirtualMachine) throws(E) -> T
   ) throws(E) -> T? {
     try self.runner.withLock { runner throws(E) in
