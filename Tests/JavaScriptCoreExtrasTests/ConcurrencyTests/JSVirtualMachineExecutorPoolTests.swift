@@ -51,12 +51,12 @@ struct JSVirtualMachineExecutorPoolTests {
     let update: @convention(block) @Sendable (String) -> Void = { id in
       ids.withLock { $0.append(id) }
     }
-    await c1.withIsolation { @Sendable in $0.context.setObject(update, forPath: "update") }
-    await c2.withIsolation { @Sendable in $0.context.setObject(update, forPath: "update") }
+    await c1.withIsolation { @Sendable in $0.value.setObject(update, forPath: "update") }
+    await c2.withIsolation { @Sendable in $0.value.setObject(update, forPath: "update") }
 
     let task1 = Task {
       await c1.withIsolation { @Sendable in
-        _ = $0.context.evaluateScript(
+        _ = $0.value.evaluateScript(
           """
           const id = "context1"
           for (let i = 0; i < 10_000; i++) {
@@ -68,7 +68,7 @@ struct JSVirtualMachineExecutorPoolTests {
     }
     let task2 = Task {
       await c2.withIsolation { @Sendable in
-        _ = $0.context.evaluateScript(
+        _ = $0.value.evaluateScript(
           """
           const id = "context2"
           for (let i = 0; i < 10_000; i++) {

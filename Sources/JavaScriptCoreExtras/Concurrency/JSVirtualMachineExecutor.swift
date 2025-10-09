@@ -1,5 +1,5 @@
 import Foundation
-import JavaScriptCore
+@preconcurrency import JavaScriptCore
 
 // MARK: - JSVirtualMachineExecutor
 
@@ -95,15 +95,16 @@ extension JSVirtualMachineExecutor {
 // MARK: - JSContextActor Creation
 
 extension JSVirtualMachineExecutor {
-  public func contextActor() async -> JSContextActor {
-    await self.withVirtualMachine { _ in
-      // NB: Guaranteed to be non-nil because the virtual machine is available.
-      JSContextActor(executor: self)!
+  public func contextActor() async -> JSActor<JSContext> {
+    await self.withVirtualMachine { vm in
+      JSActor(JSContext(virtualMachine: vm), executor: self)
     }
   }
 
-  public func contextActorIfAvailable() -> JSContextActor? {
-    JSContextActor(executor: self)
+  public func contextActorIfCurrentExecutor() -> JSActor<JSContext>? {
+    self.withVirtualMachineIfCurrentExecutor { vm in
+      JSActor(JSContext(virtualMachine: vm), executor: self)
+    }
   }
 }
 
