@@ -30,4 +30,11 @@ public final actor JSActor<Value> {
   ) throws(E) -> sending T {
     try operation(self)
   }
+
+  public func withIsolation<T, E: Error>(
+    perform operation: (isolated JSActor, JSVirtualMachine) throws(E) -> sending T
+  ) throws(E) -> sending T {
+    // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
+    try operation(self, JSVirtualMachine.threadLocal!)
+  }
 }

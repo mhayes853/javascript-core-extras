@@ -4,7 +4,6 @@ import Testing
 
 @Suite("JSContextActor tests")
 struct JSContextActorTests {
-
   @Test("Basic JS Execution")
   func basicJSExecution() async throws {
     let pool = JSVirtualMachineExecutorPool(count: 1)
@@ -13,6 +12,17 @@ struct JSContextActorTests {
     await context.withIsolation { @Sendable in
       let value = $0.value.evaluateScript("1 === 2")
       expectNoDifference(value?.toBool(), false)
+    }
+  }
+
+  @Test("Has Isolation With Virtual Machine")
+  func hasIsolationWithVirtualMachine() async throws {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+    let e = await pool.executor()
+    let context = await e.contextActor()
+
+    await context.withIsolation { @Sendable a, vm in
+      expectNoDifference(a.value.virtualMachine === vm, true)
     }
   }
 
