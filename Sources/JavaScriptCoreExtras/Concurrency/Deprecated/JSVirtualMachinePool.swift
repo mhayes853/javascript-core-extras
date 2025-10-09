@@ -18,6 +18,7 @@
 /// overhead. You can call ``virutalMachine`` on the pool to get a virtual machine instance to
 /// create a `JSContext`. Virtual machines are created lazily, and are delegated round-robin
 /// style.
+@available(*, deprecated, message: "Use ``JSVirtualMachineExecutorPool`` instead.")
 public final class JSVirtualMachinePool: @unchecked Sendable {
   fileprivate typealias State = (
     index: Int, count: Int, machines: UnsafeMutablePointer<JSVirtualMachine?>
