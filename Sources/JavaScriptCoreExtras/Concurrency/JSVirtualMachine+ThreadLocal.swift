@@ -1,5 +1,4 @@
 import Foundation
-import JavaScriptCore
 
 extension JSVirtualMachine {
   private static let key = "__jsCoreExtrasThreadLocalVirtualMachine__"

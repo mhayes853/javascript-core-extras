@@ -2,6 +2,16 @@
 
 // MARK: - JSVirtualMachinePool
 
+/// An object pool of ``JSVirtualMachineExecutor`` instances.
+///
+/// You can run JavaScript concurrently by createing multiple `JSContext` instances that use
+/// separate `JSVirtualMachine` instances on different threads. However, this is potential
+/// bottleneck if your application needs to create a separate thread to run many different
+/// `JSContext` instances at once.
+///
+/// You can use this class to limit the number of executor instances and threads that are
+/// created by your application to execute JavaScript. Additionally, you can call
+/// ``garbageCollect()`` to free any inactive executors from the pool.
 public final class JSVirtualMachineExecutorPool: @unchecked Sendable {
   private struct ExecutorCell {
     var referenceCount = 0
@@ -25,12 +35,12 @@ public final class JSVirtualMachineExecutorPool: @unchecked Sendable {
   private let state: Lock<State>
   private var isCreatingMachineCondition = false
 
-  /// Creates a virutal machine pool.
+  /// Creates a pool.
   ///
   /// - Parameters:
-  ///   - count: The maximum number of virtual machines to contain in the pool.
+  ///   - count: The maximum number of executors to contain in the pool.
   ///   - createVirtualMachine: A function to create a custom virtual machine that is called every
-  ///     time the pool creates a new `JSVirtualMachine`.
+  ///     time the pool creates a new ``JSVirtualMachineExecutor``.
   public init(
     count: Int,
     createVirtualMachine: @escaping @Sendable () -> JSVirtualMachine = { JSVirtualMachine() }
@@ -48,7 +58,13 @@ public final class JSVirtualMachineExecutorPool: @unchecked Sendable {
 // MARK: - Accessing an Executor
 
 extension JSVirtualMachineExecutorPool {
-  /// Returns a ``JSVirtualMachineExecutor`` from this pool.
+  /// Returns a ``JSVirtualMachineExecutor`` from this pool, and increments its reference count by 1.
+  ///
+  /// The returned executor will have its reference count incremented by 1, you can call
+  /// ``release(executor:)`` to decrement the reference count for the retuened executor.
+  ///
+  /// When this pool creates a new executor through this method, it will automatically begin
+  /// running the executor for you.
   ///
   /// The executor returned is picked round-robin style.
   ///
@@ -113,6 +129,13 @@ extension JSVirtualMachineExecutorPool {
 // MARK: - Object Management
 
 extension JSVirtualMachineExecutorPool {
+  /// Decrements the reference count for a ``JSVirtualMachineExecutor`` by 1 in this pool.
+  ///
+  /// Obtaining an executor from the pool through calling ``executor()`` increments the reference
+  /// count by 1 for the returned executor. You can pass the returned executor to this method to
+  /// decrement the reference count of the executor by 1.
+  ///
+  /// - Parameter executor: The executor.
   public func release(executor: JSVirtualMachineExecutor) {
     self.condition.lock()
     self.state.withLock { state in
@@ -124,7 +147,15 @@ extension JSVirtualMachineExecutorPool {
     }
     self.condition.unlock()
   }
-
+  
+  /// Stops and removes any ``JSVirtualMachineExecutor`` instances from this pool with a reference
+  /// count of 0 or lower.
+  ///
+  /// Obtaining an executor from the pool through calling ``executor()`` increments the reference
+  /// count by 1 for the returned executor.
+  ///
+  /// Calling ``release(executor:)`` with an executor decrements the reference count by 1 for the
+  /// specified executor.
   public func garbageCollect() {
     self.condition.lock()
     self.state.withLock { state in
