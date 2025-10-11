@@ -245,7 +245,7 @@ extension JSValue {
     return name.isEmpty ? "(anonymous)" : name
   }
 
-  fileprivate var instanceVariableNames: [String]? {
+  var instanceVariableNames: [String]? {
     let names = self.context.objectForKeyedSubscript("Object")?
       .objectForKeyedSubscript("getOwnPropertyNames")
       .call(withArguments: [self])

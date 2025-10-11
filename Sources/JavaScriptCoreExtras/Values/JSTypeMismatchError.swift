@@ -1,0 +1,1 @@
+struct JSTypeMismatchError: Error {}
