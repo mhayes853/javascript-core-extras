@@ -6,7 +6,7 @@ import JavaScriptCore
 public protocol ConvertibleFromJSValue {
   /// The error thrown if the `JSValue` cannot be converted.
   associatedtype FromJSValueFailure: Error
-  
+
   /// Converts a `JSValue` to this value.
   ///
   /// - Parameter jsValue: The `JSValue` to convert.
@@ -19,7 +19,7 @@ public protocol ConvertibleFromJSValue {
 public protocol ConvertibleToJSValue {
   /// The error thrown if this value cannot be converted.
   associatedtype ToJSValueFailure: Error
-  
+
   /// Converts this value to a `JSValue`.
   ///
   /// - Parameter context: The `JSContext` to use for the conversion.

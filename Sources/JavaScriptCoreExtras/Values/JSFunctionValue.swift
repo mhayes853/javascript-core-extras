@@ -7,7 +7,7 @@ public struct JSFunctionValue<
   Value: JSValueConvertible
 > {
   private let function: (repeat (each Arguments)) throws -> Value
-  
+
   /// Creates a function.
   ///
   /// - Parameters:
@@ -139,5 +139,149 @@ extension JSValue {
   /// Whether or not this value is a function.
   public var isFunction: Bool {
     self.isInstanceOf(className: "Function")
+  }
+}
+
+// MARK: - Helpers
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
+extension JSValue {
+  /// Sets a function for the specified key.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The key.
+  public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
+    forKey key: Any,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Value,
+  ) {
+    self.set(
+      value: JSFunctionValue<repeat (each Arguments), Value>(
+        repeat (each argumentTypes),
+        function: function
+      ),
+      forKey: key
+    )
+  }
+
+  /// Sets a function for the specified key.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The key.
+  public func setFunction<each Arguments: JSValueConvertible>(
+    forKey key: Any,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Void,
+  ) {
+    self.set(
+      value: JSFunctionValue<repeat (each Arguments), JSVoidValue>(
+        repeat (each argumentTypes),
+        function: function
+      ),
+      forKey: key
+    )
+  }
+
+  /// Sets a function for the specified index.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The index.
+  public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
+    atIndex index: Int,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Value,
+  ) {
+    self.set(
+      value: JSFunctionValue<repeat (each Arguments), Value>(
+        repeat (each argumentTypes),
+        function: function
+      ),
+      atIndex: index
+    )
+  }
+
+  /// Sets a function for the specified index.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The index.
+  public func setFunction<each Arguments: JSValueConvertible>(
+    atIndex index: Int,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Void
+  ) {
+    self.set(
+      value: JSFunctionValue<repeat (each Arguments), JSVoidValue>(
+        repeat (each argumentTypes),
+        function: function
+      ),
+      atIndex: index
+    )
+  }
+}
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
+extension JSContext {
+  /// Sets a function for the specified key.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The key.
+  public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
+    forKey key: Any,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Value,
+  ) {
+    self.globalObject.setFunction(forKey: key, repeat (each argumentTypes), function: function)
+  }
+
+  /// Sets a function for the specified key.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The key.
+  public func setFunction<each Arguments: JSValueConvertible>(
+    forKey key: Any,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Void,
+  ) {
+    self.globalObject.setFunction(forKey: key, repeat (each argumentTypes), function: function)
+  }
+
+  /// Sets a function for the specified index.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The index.
+  public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
+    atIndex index: Int,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Value,
+  ) {
+    self.globalObject.setFunction(atIndex: index, repeat (each argumentTypes), function: function)
+  }
+
+  /// Sets a function for the specified index.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types.
+  ///   - function: The function body.
+  ///   - key: The index.
+  public func setFunction<each Arguments: JSValueConvertible>(
+    atIndex index: Int,
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Void,
+  ) {
+    self.globalObject.setFunction(atIndex: index, repeat (each argumentTypes), function: function)
   }
 }
