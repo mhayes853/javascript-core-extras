@@ -16,9 +16,7 @@ extension CGRect: JSValueConvertible {
 
 extension JSValue {
   public var isRect: Bool {
-    self.objectForKeyedSubscript("x").isNumber && self.objectForKeyedSubscript("y").isNumber
-      && self.objectForKeyedSubscript("width").isNumber
-      && self.objectForKeyedSubscript("height").isNumber
+    self.isSize && self.isPoint
   }
 }
 
@@ -39,5 +37,24 @@ extension JSValue {
   public var isSize: Bool {
     self.objectForKeyedSubscript("width").isNumber
       && self.objectForKeyedSubscript("height").isNumber
+  }
+}
+
+// MARK: - CGPoint
+
+extension CGPoint: JSValueConvertible {
+  public init(jsValue: JSValue) throws {
+    guard jsValue.isPoint else { throw JSTypeMismatchError() }
+    self = jsValue.toPoint()
+  }
+
+  public func jsValue(in context: JSContext) -> JSValue {
+    JSValue(point: self, in: context)
+  }
+}
+
+extension JSValue {
+  public var isPoint: Bool {
+    self.objectForKeyedSubscript("x").isNumber && self.objectForKeyedSubscript("y").isNumber
   }
 }

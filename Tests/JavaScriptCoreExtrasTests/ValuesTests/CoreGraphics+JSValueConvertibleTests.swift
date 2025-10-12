@@ -83,4 +83,42 @@ struct CoreGraphicsJSValueConvertibleTests {
 
     expectNoDifference(try CGSize(jsValue: jsValue), rect)
   }
+
+  @Test(
+    "JSValue Is Point",
+    arguments: [
+      ({ @Sendable c in JSValue(newObjectIn: c) }, false),
+      ({ @Sendable c in JSValue(bool: true, in: c) }, false),
+      ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
+      (
+        { @Sendable c in
+          let object = JSValue(newObjectIn: c)!
+          object.setValue(43, forPath: "x")
+          object.setValue(50, forPath: "y")
+          return object
+        },
+        true
+      ),
+      ({ @Sendable c in JSValue(point: CGPoint(x: 43, y: 50), in: c) }, true)
+    ]
+  )
+  func jsValueIsPoint(value: @Sendable (JSContext) -> JSValue, isPoint: Bool) {
+    let context = JSContext()!
+    let value = value(context)
+    expectNoDifference(value.isPoint, isPoint)
+  }
+
+  @Test("Converts Point")
+  func convertsPoint() throws {
+    let context = JSContext()!
+    let rect = CGPoint(x: 43, y: 50)
+    let jsValue = rect.jsValue(in: context)
+
+    expectNoDifference(jsValue.isObject, true)
+    expectNoDifference(jsValue.isPoint, true)
+    expectNoDifference(jsValue.objectForKeyedSubscript("x").toInt32(), 43)
+    expectNoDifference(jsValue.objectForKeyedSubscript("y").toInt32(), 50)
+
+    expectNoDifference(try CGPoint(jsValue: jsValue), rect)
+  }
 }
