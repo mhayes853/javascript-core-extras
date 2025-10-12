@@ -253,6 +253,7 @@ extension Set: ConvertibleFromJSValue where Element: ConvertibleFromJSValue {
 }
 
 extension JSValue {
+  /// Whether or not this value is a set.
   public var isSet: Bool {
     self.isInstanceOf(className: "Set")
   }

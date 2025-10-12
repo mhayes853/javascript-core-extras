@@ -15,6 +15,7 @@ extension CGRect: JSValueConvertible {
 }
 
 extension JSValue {
+  /// Whether or not this value is a rect.
   public var isRect: Bool {
     self.isSize && self.isPoint
   }
@@ -34,6 +35,7 @@ extension CGSize: JSValueConvertible {
 }
 
 extension JSValue {
+  /// Whether or not this value is a size.
   public var isSize: Bool {
     self.objectForKeyedSubscript("width").isNumber
       && self.objectForKeyedSubscript("height").isNumber
@@ -54,6 +56,7 @@ extension CGPoint: JSValueConvertible {
 }
 
 extension JSValue {
+  /// Whether or not this value is a point.
   public var isPoint: Bool {
     self.objectForKeyedSubscript("x").isNumber && self.objectForKeyedSubscript("y").isNumber
   }
