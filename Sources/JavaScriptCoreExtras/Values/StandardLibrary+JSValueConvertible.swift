@@ -258,3 +258,44 @@ extension JSValue {
     self.isInstanceOf(className: "Set")
   }
 }
+
+// MARK: - Optional
+
+extension Optional: ConvertibleToJSValue where Wrapped: ConvertibleToJSValue {
+  public func jsValue(in context: JSContext) throws(Wrapped.ToJSValueFailure) -> JSValue {
+    if let value = self {
+      try value.jsValue(in: context)
+    } else {
+      JSValue(undefinedIn: context)
+    }
+  }
+}
+
+extension Optional: ConvertibleFromJSValue where Wrapped: ConvertibleFromJSValue {
+  public init(jsValue: JSValue) throws(Wrapped.FromJSValueFailure) {
+    if jsValue.isUndefined || jsValue.isNull {
+      self = nil
+    } else {
+      self = try Wrapped(jsValue: jsValue)
+    }
+  }
+}
+
+// MARK: - RawRepresentable
+
+extension RawRepresentable where Self: ConvertibleToJSValue, RawValue: ConvertibleToJSValue {
+  public func jsValue(in context: JSContext) throws(RawValue.ToJSValueFailure) -> JSValue {
+    try self.rawValue.jsValue(in: context)
+  }
+}
+
+extension RawRepresentable where Self: ConvertibleFromJSValue, RawValue: ConvertibleFromJSValue {
+  public init(jsValue: JSValue) throws {
+    guard let value = Self(rawValue: try RawValue(jsValue: jsValue)) else {
+      throw InvalidRawValueError()
+    }
+    self = value
+  }
+}
+
+private struct InvalidRawValueError: Error {}

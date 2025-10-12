@@ -246,6 +246,25 @@ struct CodableJSValueConvertibleTests {
 
     expectNoDifference(jsValue.objectAtIndexedSubscript(0).isObject, true)
   }
+
+  @Test("Nil Value Encodes As Undefined")
+  func nilValueEncodesAsUndefined() throws {
+    struct Value: Hashable, Codable, ConvertibleToJSValue {
+      let inner: MultiField?
+
+      func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeNil(forKey: .inner)
+      }
+    }
+
+    let context = JSContext()!
+    let value = Value(inner: nil)
+    let jsValue = try value.jsValue(in: context)
+
+    expectNoDifference(jsValue.hasProperty("inner"), true)
+    expectNoDifference(jsValue.objectForKeyedSubscript("inner").isUndefined, true)
+  }
 }
 
 private struct MultiField: Hashable, Codable, JSValueConvertible {
