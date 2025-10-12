@@ -225,3 +225,35 @@ extension Dictionary: ConvertibleFromJSValue where Key == String, Value: Convert
     }
   }
 }
+
+// MARK: - Set
+
+extension Set: ConvertibleToJSValue where Element: ConvertibleToJSValue {
+  public func jsValue(in context: JSContext) throws(Element.ToJSValueFailure) -> JSValue {
+    let set = context.objectForKeyedSubscript("Set").construct(withArguments: [])!
+    for element in self {
+      set.invokeMethod("add", withArguments: [try element.jsValue(in: context)])
+    }
+    return set
+  }
+}
+
+extension Set: ConvertibleFromJSValue where Element: ConvertibleFromJSValue {
+  public init(jsValue: JSValue) throws {
+    guard jsValue.isSet else { throw JSTypeMismatchError() }
+    self.init()
+
+    let values = jsValue.invokeMethod("values", withArguments: [])!
+    while let element = values.invokeMethod("next", withArguments: []),
+      !element.objectForKeyedSubscript("done").toBool()
+    {
+      self.insert(try Element(jsValue: element.objectForKeyedSubscript("value")))
+    }
+  }
+}
+
+extension JSValue {
+  public var isSet: Bool {
+    self.isInstanceOf(className: "Set")
+  }
+}

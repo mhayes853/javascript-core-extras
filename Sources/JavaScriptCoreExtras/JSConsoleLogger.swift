@@ -204,10 +204,6 @@ extension JSValue {
 }
 
 extension JSValue {
-  fileprivate var isSet: Bool {
-    self.isInstanceOf(className: "Set")
-  }
-
   fileprivate var isFunction: Bool {
     self.isInstanceOf(className: "Function")
   }
@@ -216,7 +212,7 @@ extension JSValue {
     self.isInstanceOf(className: "Map")
   }
 
-  private func isInstanceOf(className: String) -> Bool {
+  func isInstanceOf(className: String) -> Bool {
     self.context.objectForKeyedSubscript(className).map { self.isInstance(of: $0) } ?? false
   }
 

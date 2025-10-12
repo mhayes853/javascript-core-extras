@@ -29,4 +29,19 @@ struct StandardLibraryJSValueConvertibleTests {
 
     expectNoDifference(try [String: Int](jsValue: jsValue), values)
   }
+
+  @Test("Converts Set Of Values")
+  func convertsSetOfValues() throws {
+    let context = JSContext()!
+    let values = Set([20, 30])
+    let jsValue = values.jsValue(in: context)
+
+    expectNoDifference(jsValue.isSet, true)
+    expectNoDifference(jsValue.isObject, true)
+    expectNoDifference(jsValue.invokeMethod("has", withArguments: [20]).toBool(), true)
+    expectNoDifference(jsValue.invokeMethod("has", withArguments: [30]).toBool(), true)
+    expectNoDifference(jsValue.invokeMethod("has", withArguments: [40]).toBool(), false)
+
+    expectNoDifference(try Set<Int>(jsValue: jsValue), values)
+  }
 }
