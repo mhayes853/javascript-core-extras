@@ -54,7 +54,8 @@ extension JSDecoder {
     }
 
     func decodeNil(forKey key: Key) throws -> Bool {
-      self.object.objectForKeyedSubscript(key.stringValue)?.isNull ?? false
+      let value = try self.require(key)
+      return value.isNull || value.isUndefined
     }
 
     func require(_ key: Key) throws -> JSValue {
@@ -176,7 +177,8 @@ extension JSDecoder {
     }
 
     mutating func decodeNil() throws -> Bool {
-      try self.requireNext().isNull
+      let value = try self.requireNext()
+      return value.isNull || value.isUndefined
     }
 
     mutating func decode(_ type: Bool.Type) throws -> Bool {
@@ -269,7 +271,7 @@ extension JSDecoder {
     var codingPath: [CodingKey]
 
     func decodeNil() -> Bool {
-      self.value.isNull
+      self.value.isNull || self.value.isUndefined
     }
 
     func decode(_ type: Bool.Type) throws -> Bool {

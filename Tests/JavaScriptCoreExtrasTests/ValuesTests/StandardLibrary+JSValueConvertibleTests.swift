@@ -44,4 +44,36 @@ struct StandardLibraryJSValueConvertibleTests {
 
     expectNoDifference(try Set<Int>(jsValue: jsValue), values)
   }
+
+  @Test("RawRepresentable Conversion")
+  func rawRepresentableConversion() throws {
+    struct SomeValue: Hashable, RawRepresentable, JSValueConvertible {
+      let rawValue: Int
+    }
+
+    let context = JSContext()!
+
+    let someValue = SomeValue(rawValue: 42)
+    let jsValue = someValue.jsValue(in: context)
+
+    expectNoDifference(jsValue.isNumber, true)
+    expectNoDifference(jsValue.toInt32(), 42)
+
+    expectNoDifference(try SomeValue(jsValue: jsValue), someValue)
+  }
+
+  @Test("Optional Conversion")
+  func optionalConversion() throws {
+    let context = JSContext()!
+
+    let someValue: Int? = 42
+    let jsValue = someValue.jsValue(in: context)
+
+    expectNoDifference(jsValue.isNumber, true)
+    expectNoDifference(jsValue.toInt32(), 42)
+
+    expectNoDifference(try Int?(jsValue: jsValue), someValue)
+    expectNoDifference(try Int?(jsValue: JSValue(undefinedIn: context)), nil)
+    expectNoDifference(try Int?(jsValue: JSValue(nullIn: context)), nil)
+  }
 }

@@ -88,8 +88,8 @@ extension JSEncoder {
     var userInfo: [CodingUserInfoKey: Any]
 
     func encodeNil(forKey key: Key) throws {
-      let null = JSValue(nullIn: self.context)
-      self.object.setObject(null, forKeyedSubscript: key.stringValue as NSString)
+      let undefined = JSValue(undefinedIn: self.context)
+      self.object.setObject(undefined, forKeyedSubscript: key.stringValue as NSString)
     }
 
     func encode(_ value: Bool, forKey key: Key) throws {
@@ -213,7 +213,7 @@ extension JSEncoder {
     func superEncoder(forKey key: Key) -> Encoder {
       _ContainerEncoder(
         context: self.context,
-        codingPath: self.codingPath + [SuperCodingKey()],
+        codingPath: self.codingPath + [key],
         userInfo: self.userInfo,
         assign: { self.object.setObject($0, forKeyedSubscript: key.stringValue as NSString) }
       )
@@ -230,7 +230,7 @@ extension JSEncoder {
     var count = 0
 
     mutating func encodeNil() throws {
-      self.array.setObject(JSValue(nullIn: self.context), atIndexedSubscript: self.count)
+      self.array.setObject(JSValue(undefinedIn: self.context), atIndexedSubscript: self.count)
       self.count += 1
     }
 
@@ -364,7 +364,7 @@ extension JSEncoder {
       self.count += 1
       return _ContainerEncoder(
         context: self.context,
-        codingPath: self.codingPath + [SuperCodingKey()],
+        codingPath: self.codingPath,
         userInfo: self.userInfo,
         assign: { [self] in self.array.setObject($0, atIndexedSubscript: index) }
       )
