@@ -1,3 +1,8 @@
+import JavaScriptCore
+
+/// A type that can be converted to and from a `JSValue` that represents a Void.
+///
+/// This type will always be converted to and from `undefined` in JavaScript.
 public struct JSVoidValue: Sendable, JSValueConvertible {
   public init() {}
 

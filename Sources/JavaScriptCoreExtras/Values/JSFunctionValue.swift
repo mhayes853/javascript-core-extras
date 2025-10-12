@@ -1,12 +1,18 @@
 // MARK: - JSFunctionValue
 
+/// A strongly typed function value that can be converted to and from a `JSValue`.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
 public struct JSFunctionValue<
   each Arguments: JSValueConvertible,
   Value: JSValueConvertible
 > {
   private let function: (repeat (each Arguments)) throws -> Value
-
+  
+  /// Creates a function.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types of the function.
+  ///   - function: The function body.
   public init(
     _ argumentTypes: repeat (each Arguments).Type,
     function: @escaping (repeat (each Arguments)) throws -> Value
@@ -23,6 +29,11 @@ public struct JSFunctionValue<
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
 extension JSFunctionValue {
+  /// Creates a void function.
+  ///
+  /// - Parameters:
+  ///   - argumentTypes: The argument types of the function.
+  ///   - function: The function body.
   public init(
     _ argumentTypes: repeat (each Arguments).Type,
     function: @escaping (repeat (each Arguments)) throws -> Void
@@ -125,6 +136,7 @@ extension JSFunctionValue: ConvertibleFromJSValue {
 // MARK: - Is Function
 
 extension JSValue {
+  /// Whether or not this value is a function.
   public var isFunction: Bool {
     self.isInstanceOf(className: "Function")
   }
