@@ -204,10 +204,6 @@ extension JSValue {
 }
 
 extension JSValue {
-  fileprivate var isFunction: Bool {
-    self.isInstanceOf(className: "Function")
-  }
-
   fileprivate var isMap: Bool {
     self.isInstanceOf(className: "Map")
   }

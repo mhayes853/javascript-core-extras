@@ -2,35 +2,39 @@
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
 public struct JSFunctionValue<
-  each Arguments: ConvertibleFromJSValue,
-  Value: ConvertibleToJSValue,
-  Failure: Error
+  each Arguments: JSValueConvertible,
+  Value: JSValueConvertible
 > {
-  private let function: (repeat (each Arguments)) throws(Failure) -> Value
+  private let function: (repeat (each Arguments)) throws -> Value
 
   public init(
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws(Failure) -> Value
+    function: @escaping (repeat (each Arguments)) throws -> Value
   ) {
     self.function = function
   }
 
-  public init(
-    _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws(Failure) -> Void
-  ) where Value == JSVoidValue {
-    self.function = { (args: repeat (each Arguments)) throws(Failure) in
-      try function(repeat each args)
-      return JSVoidValue()
-    }
-  }
-
-  public func callAsFunction(_ arguments: repeat (each Arguments)) throws(Failure) -> Value {
+  public func callAsFunction(_ arguments: repeat (each Arguments)) throws -> Value {
     try self.function(repeat each arguments)
   }
 }
 
-// MARK: - JSValueConvertible
+// MARK: - Void
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
+extension JSFunctionValue {
+  public init(
+    _ argumentTypes: repeat (each Arguments).Type,
+    function: @escaping (repeat (each Arguments)) throws -> Void
+  ) where Value == JSVoidValue {
+    self.function = { (args: repeat (each Arguments)) in
+      try function(repeat each args)
+      return JSVoidValue()
+    }
+  }
+}
+
+// MARK: - ConvertibleToJSValue
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
 extension JSFunctionValue: ConvertibleToJSValue {
@@ -83,5 +87,45 @@ private struct JSFunctionTooFewArgumentsError: Error, ConvertibleToJSValue {
       ? "\(expected) arguments required, but only \(got) present."
       : "\(expected) argument required, but only \(got) present."
     return .typeError(message: "Failed to execute function: \(argsMessage)", in: context)
+  }
+}
+
+// MARK: - ConvertibleFromJSValue
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, *)
+extension JSFunctionValue: ConvertibleFromJSValue {
+  public init(jsValue: JSValue) throws {
+    guard jsValue.isFunction else { throw JSTypeMismatchError() }
+
+    self.init(repeat (each Arguments).self) { (args: repeat (each Arguments)) -> Value in
+      var jsArgs = [JSValue]()
+      for arg in repeat each args {
+        jsArgs.append(try arg.jsValue(in: jsValue.context))
+      }
+      guard let value = jsValue.call(withArguments: jsArgs) else {
+        throw JSError()
+      }
+      guard let exception = jsValue.context.exception else {
+        return try Value(jsValue: value)
+      }
+
+      if let executor = JSVirtualMachineExecutor.current() {
+        // NB: This is safe because we're on the current executor thread, and the actor will
+        // isolate the exception to that thread.
+        throw JSError(
+          valueActor: JSActor(UnsafeTransfer(value: exception).value, executor: executor)
+        )
+      } else {
+        throw JSError()
+      }
+    }
+  }
+}
+
+// MARK: - Is Function
+
+extension JSValue {
+  public var isFunction: Bool {
+    self.isInstanceOf(className: "Function")
   }
 }

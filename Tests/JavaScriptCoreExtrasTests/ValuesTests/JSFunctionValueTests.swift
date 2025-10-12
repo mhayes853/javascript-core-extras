@@ -90,4 +90,99 @@ struct JSFunctionValueTests {
     expectNoDifference(context.exception.toString(), "blob")
     expectNoDifference(value?.isUndefined, true)
   }
+
+  @Test("Throws When Trying To Construct From Non-Function Value")
+  func throwsWhenTryingToConstructFromNonFunctionValue() throws {
+    let value = JSValue(object: "blob", in: JSContext()!)!
+    #expect(throws: Error.self) {
+      try JSFunctionValue<Int, String>(jsValue: value)
+    }
+  }
+
+  @Test("Constructs From Function Value")
+  func constructsFromFunctionValue() throws {
+    let context = JSContext()!
+    let jsValue = context.evaluateScript(
+      """
+      function increment(n) {
+        return n + 1
+      }
+
+      increment
+      """
+    )
+
+    let f = try JSFunctionValue<Int, Int>(jsValue: jsValue!)
+    expectNoDifference(try f(10), 11)
+  }
+
+  @Test("Passes Swift Value To JS")
+  func passesSwiftValueToJS() throws {
+    struct Value: Codable, JSValueConvertible {
+      let name: String
+    }
+
+    let context = JSContext()!
+    let jsValue = context.evaluateScript(
+      """
+      function hello(obj) {
+        return `Hello ${obj.name}`
+      }
+
+      hello
+      """
+    )
+
+    let f = try JSFunctionValue<Value, String>(jsValue: jsValue!)
+    expectNoDifference(try f(Value(name: "blob")), "Hello blob")
+  }
+
+  @Test("Forwards JS Errors")
+  func forwardsJSErrors() async throws {
+    let pool = JSVirtualMachineExecutorPool(count: 1)
+
+    let message = "This is an error."
+    let contextActor = await pool.executor().contextActor()
+    let error = try await contextActor.withIsolation { @Sendable contextActor in
+      let jsValue = contextActor.value.evaluateScript(
+        """
+        function hello() {
+          throw new Error("\(message)")
+        }
+
+        hello
+        """
+      )
+
+      let f = try JSFunctionValue<JSVoidValue, Never>(jsValue: jsValue!)
+      return #expect(throws: JSError.self) {
+        try f(JSVoidValue())
+      }
+    }
+    await error?.valueActor?
+      .withIsolation { @Sendable in
+        expectNoDifference($0.value.toString(), "Error: \(message)")
+      }
+  }
+
+  @Test("Forwards JS Errors As Nil When No Current Executor")
+  func forwardsJSErrorsAsNilWhenNoCurrentExecutor() async throws {
+    let message = "This is an error."
+    let context = JSContext()!
+    let jsValue = context.evaluateScript(
+      """
+      function hello() {
+        throw new Error("\(message)")
+      }
+
+      hello
+      """
+    )
+
+    let f = try JSFunctionValue<JSVoidValue, Never>(jsValue: jsValue!)
+    let error = #expect(throws: JSError.self) {
+      try f(JSVoidValue())
+    }
+    expectNoDifference(error?.valueActor == nil, true)
+  }
 }
