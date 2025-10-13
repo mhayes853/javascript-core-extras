@@ -4,6 +4,7 @@ import IssueReporting
 // MARK: - JSPromise
 
 /// A data type that implements Promise functionallity over a `JSValue`.
+@available(*, deprecated, message: "Use ``JSPromiseValue`` instead")
 public struct JSPromise: Sendable {
   private let transfer: UnsafeJSValueTransfer
 
