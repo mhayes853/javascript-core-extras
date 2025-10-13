@@ -26,7 +26,7 @@ extension JSPromiseValue where Value: Sendable {
     let promise = Self(in: context) { resolvers = $0 }
     return (promise, resolvers!)
   }
-  
+
   /// Creates a promise.
   ///
   /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
@@ -96,14 +96,14 @@ extension JSPromiseValue where Value: Sendable {
     let resolversActor:
       JSActor<(resolve: JSValue, reject: JSValue, context: JSContext, didFinish: Bool)>
     let contextActor: JSActor<JSContext>
-    
+
     /// Resolves the promise with the specified `value`.
     ///
     /// - Parameter value: The value to resolve.
     public func resolve(_ value: Value) async {
       await self.finish(with: .success(value))
     }
-    
+
     /// Resolves the promise with the specified `value`.
     ///
     /// - Parameter value: The value to resolve.
@@ -119,7 +119,7 @@ extension JSPromiseValue where Value: Sendable {
     public func reject(_ error: any Error) async {
       await self.finish(with: .failure(error))
     }
-    
+
     /// Rejects the promise with the specified `error`.
     ///
     /// - Parameter error: The error to reject with.
@@ -128,7 +128,7 @@ extension JSPromiseValue where Value: Sendable {
         _ = resolversActor.value.reject.call(withArguments: [error])
       }
     }
-    
+
     /// Resolves or rejects the promise based on the specified `result`.
     ///
     /// - Parameter result: The result to finish the promise with.
@@ -147,7 +147,7 @@ extension JSPromiseValue where Value: Sendable {
         resolversActor.value.didFinish = true
       }
     }
-    
+
     /// Allows access to the underlying `JSContext` of the promise.
     ///
     /// - Parameter operation: The operation to run with the context.
@@ -159,7 +159,7 @@ extension JSPromiseValue where Value: Sendable {
         try operation(contextActor.value)
       }
     }
-    
+
     /// Allows access to the underlying `JSContext` of the promise.
     ///
     /// - Parameter operation: The operation to run with the context.
@@ -380,7 +380,7 @@ extension JSPromiseValue {
   /// - Parameter onRejected: A transform for the rejected reason.
   /// - Returns: A transformed promise.
   public func `catch`<NewValue>(
-    onRejected: ((JSValue) -> NewValue)? = nil
+    onRejected: ((JSValue) throws -> NewValue)? = nil
   ) -> JSPromiseValue<NewValue> {
     self.then(onResolved: nil, onRejected: onRejected)
   }
@@ -390,7 +390,7 @@ extension JSPromiseValue {
   /// - Parameter onRejected: A transform for the rejected reason.
   /// - Returns: A transformed promise.
   public func `catch`<NewValue>(
-    onRejected: ((JSValue) -> JSPromiseValue<NewValue>)? = nil
+    onRejected: ((JSValue) throws -> JSPromiseValue<NewValue>)? = nil
   ) -> JSPromiseValue<NewValue> {
     self.then(onResolved: nil, onRejected: onRejected)
   }
@@ -403,7 +403,7 @@ extension JSPromiseValue {
   /// - Returns: A transformed promise.
   public func `catch`<NewValue>(
     _ type: NewValue.Type,
-    onRejected: ((JSValue) -> JSValue)? = nil
+    onRejected: ((JSValue) throws -> JSValue)? = nil
   ) -> JSPromiseValue<NewValue> {
     self.then(type, onResolved: nil, onRejected: onRejected)
   }
