@@ -154,9 +154,9 @@ struct JSFunctionValueTests {
         """
       )
 
-      let f = try JSFunctionValue<JSVoidValue, Never>(jsValue: jsValue!)
+      let f = try JSFunctionValue<JSUndefinedValue, Never>(jsValue: jsValue!)
       return #expect(throws: JSError.self) {
-        try f(JSVoidValue())
+        try f(JSUndefinedValue())
       }
     }
     await error?.valueActor?
@@ -179,9 +179,9 @@ struct JSFunctionValueTests {
       """
     )
 
-    let f = try JSFunctionValue<JSVoidValue, Never>(jsValue: jsValue!)
+    let f = try JSFunctionValue<JSUndefinedValue, Never>(jsValue: jsValue!)
     let error = #expect(throws: JSError.self) {
-      try f(JSVoidValue())
+      try f(JSUndefinedValue())
     }
     expectNoDifference(error?.valueActor == nil, true)
   }
