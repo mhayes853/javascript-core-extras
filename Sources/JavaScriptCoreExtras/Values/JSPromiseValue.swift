@@ -109,12 +109,19 @@ extension JSPromiseValue {
     _ value: Value,
     in context: JSContext
   ) throws(Value.ToJSValueFailure) -> JSPromiseValue<Value> {
-    let value = try value.jsValue(in: context)
-    return Self(_jsValue: JSValue(newPromiseResolvedWithResult: value, in: context))
+    .resolve(try value.jsValue(in: context), in: context)
+  }
+
+  public static func resolve(_ value: JSValue, in context: JSContext) -> JSPromiseValue<Value> {
+    Self(_jsValue: JSValue(newPromiseResolvedWithResult: value, in: context))
   }
 
   public static func reject(_ error: any Error, in context: JSContext) -> JSPromiseValue<Value> {
-    Self(_jsValue: JSValue(newPromiseRejectedWithReason: error._jsValue(in: context), in: context))
+    .reject(error._jsValue(in: context), in: context)
+  }
+
+  public static func reject(_ error: JSValue, in context: JSContext) -> JSPromiseValue<Value> {
+    Self(_jsValue: JSValue(newPromiseRejectedWithReason: error, in: context))
   }
 }
 
@@ -124,15 +131,22 @@ extension JSPromiseValue where Value: Sendable {
   public func resolvedValue(
     isolation: isolated (any Actor)? = #isolation
   ) async throws -> Value {
+    try await Value(jsValue: self.resolvedJSvalue())
+  }
+
+  public func resolvedJSvalue(
+    isolation: isolated (any Actor)? = #isolation
+  ) async throws -> JSValue {
     try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
       _ = self.then(
+        JSVoidValue.self,
         onResolved: { value in
           continuation.resume(returning: value)
-          return JSVoidValue()
+          return JSVoidValue().jsValue(in: .current())
         },
         onRejected: { error in
           continuation.resume(throwing: JSError(onCurrentExecutor: error))
-          return JSVoidValue()
+          return JSVoidValue().jsValue(in: .current())
         }
       )
     }
@@ -186,15 +200,31 @@ extension JSPromiseValue {
     onResolved: ((Value) throws -> JSPromiseValue<NewValue>)? = nil,
     onRejected: ((JSValue) throws -> JSPromiseValue<NewValue>)? = nil
   ) -> JSPromiseValue<NewValue> {
+    self.then(
+      NewValue.self,
+      onResolved: onResolved.map { onResolved in
+        return { try onResolved(Value(jsValue: $0)).jsValue(in: .current()) }
+      },
+      onRejected: onRejected.map { onRejected in
+        return { try onRejected($0).jsValue(in: .current()) }
+      }
+    )
+  }
+
+  public func then<NewValue>(
+    _ type: NewValue.Type,
+    onResolved: ((JSValue) throws -> JSValue)? = nil,
+    onRejected: ((JSValue) throws -> JSValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
     let resolved = onResolved.map { onResolved in
       let callback: @convention(block) (JSValue) -> JSValue = { jsValue in
-        tryOperation(in: .current()) { try onResolved(Value(jsValue: jsValue)) }
+        tryJSOperation(in: .current()) { try onResolved(jsValue) }
       }
       return callback
     }
     let rejected = onRejected.map { onRejected in
       let callback: @convention(block) (JSValue) -> JSValue = { jsValue in
-        tryOperation(in: .current()) { try onRejected(jsValue) }
+        tryJSOperation(in: .current()) { try onRejected(jsValue) }
       }
       return callback
     }
@@ -222,6 +252,13 @@ extension JSPromiseValue {
     onRejected: ((JSValue) -> JSPromiseValue<NewValue>)? = nil
   ) -> JSPromiseValue<NewValue> {
     self.then(onResolved: nil, onRejected: onRejected)
+  }
+
+  public func `catch`<NewValue>(
+    _ type: NewValue.Type,
+    onRejected: ((JSValue) -> JSValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(type, onResolved: nil, onRejected: onRejected)
   }
 }
 
