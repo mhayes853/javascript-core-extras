@@ -121,8 +121,8 @@ extension JSPromise {
     /// a rejected reason within a ``JSValueError``.
     public func resume(result: Result<Any?, JSValueError>) {
       switch result {
-      case let .success(value): self.resume(resolving: value)
-      case let .failure(error): self.resume(rejecting: error.value)
+      case .success(let value): self.resume(resolving: value)
+      case .failure(let error): self.resume(rejecting: error.value)
       }
     }
   }
@@ -287,6 +287,7 @@ extension JSPromise {
 // MARK: - JSPromiseRejectedError
 
 /// An error thrown by a rejected ``JSPromise``.
+@available(*, deprecated, message: "Use ``JSError`` instead.")
 public struct JSPromiseRejectedError: Error {
   /// The reason for why this promise was rejected.
   public let reason: JSValue
@@ -303,6 +304,7 @@ public struct JSPromiseRejectedError: Error {
 
 extension JSValue {
   /// This value as a ``JSPromise``.
+  @available(*, deprecated, message: "Use ``JSPromiseValue`` instead.")
   public func toPromise() -> JSPromise? {
     JSPromise(value: self)
   }
