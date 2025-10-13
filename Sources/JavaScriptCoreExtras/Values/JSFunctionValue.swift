@@ -37,10 +37,10 @@ extension JSFunctionValue {
   public init(
     _ argumentTypes: repeat (each Arguments).Type,
     function: @escaping (repeat (each Arguments)) throws -> Void
-  ) where Value == JSVoidValue {
+  ) where Value == JSUndefinedValue {
     self.function = { (args: repeat (each Arguments)) in
       try function(repeat each args)
-      return JSVoidValue()
+      return JSUndefinedValue()
     }
   }
 }
@@ -160,7 +160,7 @@ extension JSValue {
     function: @escaping (repeat (each Arguments)) throws -> Void,
   ) {
     self.set(
-      value: JSFunctionValue<repeat (each Arguments), JSVoidValue>(
+      value: JSFunctionValue<repeat (each Arguments), JSUndefinedValue>(
         repeat (each argumentTypes),
         function: function
       ),
@@ -200,7 +200,7 @@ extension JSValue {
     function: @escaping (repeat (each Arguments)) throws -> Void
   ) {
     self.set(
-      value: JSFunctionValue<repeat (each Arguments), JSVoidValue>(
+      value: JSFunctionValue<repeat (each Arguments), JSUndefinedValue>(
         repeat (each argumentTypes),
         function: function
       ),

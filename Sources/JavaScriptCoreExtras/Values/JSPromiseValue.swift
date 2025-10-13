@@ -241,14 +241,14 @@ extension JSPromiseValue where Value: Sendable {
   ) async throws -> JSValue {
     try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
       _ = self.then(
-        JSVoidValue.self,
+        JSUndefinedValue.self,
         onResolved: { value in
           continuation.resume(returning: value)
-          return JSVoidValue().jsValue(in: .current())
+          return JSUndefinedValue().jsValue(in: .current())
         },
         onRejected: { error in
           continuation.resume(throwing: JSError(onCurrentExecutor: error))
-          return JSVoidValue().jsValue(in: .current())
+          return JSUndefinedValue().jsValue(in: .current())
         }
       )
     }
