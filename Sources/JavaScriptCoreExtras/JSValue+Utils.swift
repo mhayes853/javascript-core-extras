@@ -1,5 +1,7 @@
 import JavaScriptCore
 
+// MARK: - Is Iterable
+
 extension JSValue {
   /// Whether or not this value is iterable.
   public var isIterable: Bool {
@@ -25,5 +27,16 @@ extension JSContext {
       }
       """
     )
+  }
+}
+
+// MARK: - Is Instance
+
+extension JSValue {
+  /// Returns true if this value is an instance of the specified class name.
+  ///
+  /// - Parameter className: The name of the class.
+  public func isInstanceOf(className: String) -> Bool {
+    self.context.objectForKeyedSubscript(className).map { self.isInstance(of: $0) } ?? false
   }
 }

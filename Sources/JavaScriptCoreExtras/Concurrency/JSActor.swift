@@ -33,14 +33,14 @@ import JavaScriptCore
 public final actor JSActor<Value> {
   /// The isolated value.
   public var value: Value
-  
+
   /// The executor of this actor.
   public let executor: JSVirtualMachineExecutor
 
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
     self.executor.asUnownedSerialExecutor()
   }
-  
+
   /// Returns a ``JSActor`` containing the current `JSContext` if the current context uses the
   /// same `JSVirtualMachine` as ``JSVirtualMachineExecutor/current()``.
   ///
@@ -76,7 +76,7 @@ public final actor JSActor<Value> {
     guard virtualMachineMatch ?? false else { return nil }
     return JSActor(context, executor: executor)
   }
-  
+
   /// Creates a JS actor.
   ///
   /// - Parameters:
@@ -86,7 +86,7 @@ public final actor JSActor<Value> {
     self.value = value
     self.executor = executor
   }
-  
+
   /// Performs an operation with isolated access to the value.
   ///
   /// - Parameter operation: The operation.
@@ -96,7 +96,7 @@ public final actor JSActor<Value> {
   ) throws(E) -> sending T {
     try operation(self)
   }
-  
+
   /// Performs an operation with isolated access to the value and `JSVirtualMachine` of
   /// ``executor``.
   ///
@@ -107,5 +107,27 @@ public final actor JSActor<Value> {
   ) throws(E) -> sending T {
     // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
     try operation(self, JSVirtualMachine.threadLocal!)
+  }
+
+  /// Performs an operation with isolated access to the value.
+  ///
+  /// - Parameter operation: The operation.
+  /// - Returns: The result of the operation.
+  public func withIsolation<T, E: Error>(
+    perform operation: (isolated JSActor) async throws(E) -> sending T
+  ) async throws(E) -> sending T {
+    try await operation(self)
+  }
+
+  /// Performs an operation with isolated access to the value and `JSVirtualMachine` of
+  /// ``executor``.
+  ///
+  /// - Parameter operation: The operation.
+  /// - Returns: The result of the operation.
+  public func withIsolation<T, E: Error>(
+    perform operation: (isolated JSActor, JSVirtualMachine) async throws(E) -> sending T
+  ) async throws(E) -> sending T {
+    // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
+    try await operation(self, JSVirtualMachine.threadLocal!)
   }
 }

@@ -57,7 +57,7 @@ extension JSFunctionValue: ConvertibleToJSValue {
   }
 
   private func callAsFunction(jsArguments: [JSValue], in context: JSContext) -> JSValue {
-    do {
+    tryOperation(in: context) {
       guard jsArguments.count >= self.argsCount else {
         throw JSFunctionTooFewArgumentsError(expected: self.argsCount, got: jsArguments.count)
       }
@@ -66,16 +66,7 @@ extension JSFunctionValue: ConvertibleToJSValue {
         defer { i += 1 }
         return try T(jsValue: jsArguments[i])
       }
-      return try self.function(repeat try pop((each Arguments).self)).jsValue(in: context)
-    } catch {
-      if let convertible = error as? any ConvertibleToJSValue,
-        let exception = try? convertible.jsValue(in: context)
-      {
-        context.exception = exception
-      } else {
-        context.exception = JSValue(newErrorFromMessage: error.localizedDescription, in: context)
-      }
-      return JSValue(undefinedIn: context)
+      return try self.function(repeat try pop((each Arguments).self))
     }
   }
 
@@ -116,19 +107,10 @@ extension JSFunctionValue: ConvertibleFromJSValue {
       guard let value = jsValue.call(withArguments: jsArgs) else {
         throw JSError()
       }
-      guard let exception = jsValue.context.exception else {
-        return try Value(jsValue: value)
+      if let exception = jsValue.context.exception {
+        throw JSError(onCurrentExecutor: exception)
       }
-
-      if let executor = JSVirtualMachineExecutor.current() {
-        // NB: This is safe because we're on the current executor thread, and the actor will
-        // isolate the exception to that thread.
-        throw JSError(
-          valueActor: JSActor(UnsafeTransfer(value: exception).value, executor: executor)
-        )
-      } else {
-        throw JSError()
-      }
+      return try Value(jsValue: value)
     }
   }
 }

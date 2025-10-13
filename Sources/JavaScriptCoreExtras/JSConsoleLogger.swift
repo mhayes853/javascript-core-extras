@@ -208,10 +208,6 @@ extension JSValue {
     self.isInstanceOf(className: "Map")
   }
 
-  func isInstanceOf(className: String) -> Bool {
-    self.context.objectForKeyedSubscript(className).map { self.isInstance(of: $0) } ?? false
-  }
-
   fileprivate var isClassConstructor: Bool {
     guard let prototype = self.objectForKeyedSubscript("prototype") else {
       return false

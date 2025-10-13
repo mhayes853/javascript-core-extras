@@ -1,0 +1,465 @@
+import IssueReporting
+@preconcurrency import JavaScriptCore
+
+// MARK: - JSPromiseValue
+
+/// A data type that can be converted to and from a `JSValue` that represents a promise.
+public struct JSPromiseValue<Value: JSValueConvertible> {
+  private let _jsValue: JSValue
+
+  private init(_jsValue: JSValue) {
+    self._jsValue = _jsValue
+  }
+}
+
+// MARK: - Resolvers
+
+extension JSPromiseValue where Value: Sendable {
+  /// Returns a promise with its ``Resolvers``.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
+  ///
+  /// - Parameter context: The context to create the promise in.
+  /// - Returns: A promise with its resolvers.
+  public static func withResolvers(in context: JSContext) -> (Self, Resolvers) {
+    var resolvers: Resolvers?
+    let promise = Self(in: context) { resolvers = $0 }
+    return (promise, resolvers!)
+  }
+
+  /// Creates a promise.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
+  ///
+  /// - Parameters:
+  ///   - context: The context to create the promise in.
+  ///   - operation: The asynchronous operation to run as the promise body.
+  public init(
+    in context: JSContext,
+    operation: @escaping @Sendable (JSActor<JSContext>) async throws -> Value
+  ) {
+    self.init(in: context) { resolvers in
+      Task {
+        do {
+          await resolvers.resolve(try await operation(resolvers.contextActor))
+        } catch {
+          await resolvers.reject(error)
+        }
+      }
+    }
+  }
+
+  /// Creates a promise.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
+  ///
+  /// - Parameters:
+  ///   - context: The context to create the promise in.
+  ///   - resolve: The asynchronous operation to run as the promise body.
+  public init(in context: JSContext, _ resolve: @escaping @Sendable (Resolvers) async -> Void) {
+    self.init(in: context) { resolvers in
+      Task { await resolve(resolvers) }
+    }
+  }
+
+  /// Creates a promise.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
+  ///
+  /// - Parameters:
+  ///   - context: The context to create the promise in.
+  ///   - resolve: The operation to run as the promise body.
+  public init(in context: JSContext, _ resolve: (Resolvers) -> Void) {
+    let promise = withoutActuallyEscaping(
+      { (_resolve: JSValue?, reject: JSValue?) in
+        guard let executor = JSVirtualMachineExecutor.current() else {
+          jsPromiseNoCurrentExecutor()
+        }
+        let resolvers = Resolvers(
+          resolversActor: JSActor(
+            (resolve: _resolve!, reject: reject!, context: context, didFinish: false),
+            executor: executor
+          ),
+          contextActor: JSActor(context, executor: executor)
+        )
+        resolve(resolvers)
+      },
+      do: { JSValue(newPromiseIn: context, fromExecutor: $0) }
+    )
+    self.init(_jsValue: promise!)
+  }
+}
+
+extension JSPromiseValue where Value: Sendable {
+  /// A data type that enables resolving and rejecting a ``JSPromiseValue``.
+  public struct Resolvers: Sendable {
+    let resolversActor:
+      JSActor<(resolve: JSValue, reject: JSValue, context: JSContext, didFinish: Bool)>
+    let contextActor: JSActor<JSContext>
+
+    /// Resolves the promise with the specified `value`.
+    ///
+    /// - Parameter value: The value to resolve.
+    public func resolve(_ value: Value) async {
+      await self.finish(with: .success(value))
+    }
+
+    /// Resolves the promise with the specified `value`.
+    ///
+    /// - Parameter value: The value to resolve.
+    public func resolve(_ value: JSValue) async {
+      await self.resolversActor.withIsolation { @Sendable resolversActor in
+        _ = resolversActor.value.resolve.call(withArguments: [value])
+      }
+    }
+
+    /// Rejects the promise with the specified `error`.
+    ///
+    /// - Parameter error: The error to reject with.
+    public func reject(_ error: any Error) async {
+      await self.finish(with: .failure(error))
+    }
+
+    /// Rejects the promise with the specified `error`.
+    ///
+    /// - Parameter error: The error to reject with.
+    public func reject(_ error: JSValue) async {
+      await self.resolversActor.withIsolation { @Sendable resolversActor in
+        _ = resolversActor.value.reject.call(withArguments: [error])
+      }
+    }
+
+    /// Resolves or rejects the promise based on the specified `result`.
+    ///
+    /// - Parameter result: The result to finish the promise with.
+    public func finish(with result: Result<Value, any Error>) async {
+      await self.resolversActor.withIsolation { @Sendable resolversActor in
+        if resolversActor.value.didFinish {
+          jsPromiseResolversMisuse()
+        }
+        do {
+          let jsValue = try result.get().jsValue(in: resolversActor.value.context)
+          resolversActor.value.resolve.call(withArguments: [jsValue])
+        } catch {
+          let jsValue = error._jsValue(in: resolversActor.value.context)
+          resolversActor.value.reject.call(withArguments: [jsValue])
+        }
+        resolversActor.value.didFinish = true
+      }
+    }
+
+    /// Allows access to the underlying `JSContext` of the promise.
+    ///
+    /// - Parameter operation: The operation to run with the context.
+    /// - Returns: Whatever `operation` returns.
+    public func withContext<T, E: Error>(
+      operation: @Sendable (JSContext) throws(E) -> sending T
+    ) async throws(E) -> sending T {
+      try await contextActor.withIsolation { @Sendable contextActor throws(E) in
+        try operation(contextActor.value)
+      }
+    }
+
+    /// Allows access to the underlying `JSContext` of the promise.
+    ///
+    /// - Parameter operation: The operation to run with the context.
+    /// - Returns: Whatever `operation` returns.
+    public func withContext<T, E: Error>(
+      operation: @Sendable (JSContext) async throws(E) -> sending T
+    ) async throws(E) -> sending T {
+      try await contextActor.withIsolation { @Sendable contextActor async throws(E) in
+        try await operation(contextActor.value)
+      }
+    }
+  }
+}
+
+// MARK: - Static Initializer
+
+extension JSPromiseValue {
+  /// Creates a promise that resolves to the specified `value`.
+  ///
+  /// - Parameters:
+  ///   - value: The value to resolve.
+  ///   - context: The context to resolve the value in.
+  /// - Returns: A promise.
+  public static func resolve(
+    _ value: Value,
+    in context: JSContext
+  ) throws(Value.ToJSValueFailure) -> JSPromiseValue<Value> {
+    .resolve(try value.jsValue(in: context))
+  }
+
+  /// Creates a promise that resolves to the specified `value`.
+  ///
+  /// - Parameters:
+  ///   - value: The value to resolve.
+  /// - Returns: A promise.
+  public static func resolve(_ value: JSValue) -> JSPromiseValue<Value> {
+    Self(_jsValue: JSValue(newPromiseResolvedWithResult: value, in: value.context))
+  }
+
+  /// Creates a promise that rejects to the specified `error`.
+  ///
+  /// - Parameters:
+  ///   - error: The error to reject with.
+  ///   - context: The context to reject with the error.
+  /// - Returns: A promise.
+  public static func reject(_ error: any Error, in context: JSContext) -> JSPromiseValue<Value> {
+    .reject(error._jsValue(in: context))
+  }
+
+  /// Creates a promise that rejects to the specified `error`.
+  ///
+  /// - Parameters:
+  ///   - error: The error to reject with.
+  /// - Returns: A promise.
+  public static func reject(_ error: JSValue) -> JSPromiseValue<Value> {
+    Self(_jsValue: JSValue(newPromiseRejectedWithReason: error, in: error.context))
+  }
+}
+
+// MARK: - Resolved Value
+
+extension JSPromiseValue where Value: Sendable {
+  /// Waits for the resolved value of this promise.
+  ///
+  /// - Parameter isolation: The isolation context.
+  /// - Returns: The resolved value.
+  public func resolvedValue(
+    isolation: isolated (any Actor)? = #isolation
+  ) async throws -> Value {
+    try await Value(jsValue: self.resolvedJSvalue())
+  }
+
+  /// Waits for the resolved `JSValue` of this promise.
+  ///
+  /// - Parameter isolation: The isolation context.
+  /// - Returns: The resolved value.
+  public func resolvedJSvalue(
+    isolation: isolated (any Actor)? = #isolation
+  ) async throws -> JSValue {
+    try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
+      _ = self.then(
+        JSVoidValue.self,
+        onResolved: { value in
+          continuation.resume(returning: value)
+          return JSVoidValue().jsValue(in: .current())
+        },
+        onRejected: { error in
+          continuation.resume(throwing: JSError(onCurrentExecutor: error))
+          return JSVoidValue().jsValue(in: .current())
+        }
+      )
+    }
+  }
+}
+
+// MARK: - Then
+
+extension JSPromiseValue {
+  /// Invokes `.then` on the promise.
+  ///
+  /// - Parameters:
+  ///   - onResolved: A transform for the resolved value.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func then<NewValue>(
+    onResolved: ((Value) throws -> NewValue)? = nil,
+    onRejected: ((JSValue) throws -> NewValue)? = nil,
+  ) -> JSPromiseValue<NewValue> {
+    self.then(
+      onResolved: onResolved.map { onResolved in
+        return { try .resolve(onResolved($0), in: .current()) }
+      },
+      onRejected: onRejected.map { onRejected in
+        return { try .resolve(onRejected($0), in: .current()) }
+      }
+    )
+  }
+
+  /// Invokes `.then` on the promise.
+  ///
+  /// - Parameters:
+  ///   - onResolved: A transform for the resolved value.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  @_disfavoredOverload
+  public func then<NewValue>(
+    onResolved: ((Value) throws -> JSPromiseValue<NewValue>)? = nil,
+    onRejected: ((JSValue) throws -> NewValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(
+      onResolved: onResolved,
+      onRejected: onRejected.map { onRejected in
+        return { try .resolve(onRejected($0), in: .current()) }
+      }
+    )
+  }
+
+  /// Invokes `.then` on the promise.
+  ///
+  /// - Parameters:
+  ///   - onResolved: A transform for the resolved value.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  @_disfavoredOverload
+  public func then<NewValue>(
+    onResolved: ((Value) throws -> NewValue)? = nil,
+    onRejected: ((JSValue) throws -> JSPromiseValue<NewValue>)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(
+      onResolved: onResolved.map { onResolved in
+        return { try .resolve(onResolved($0), in: .current()) }
+      },
+      onRejected: onRejected
+    )
+  }
+
+  /// Invokes `.then` on the promise.
+  ///
+  /// - Parameters:
+  ///   - onResolved: A transform for the resolved value.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func then<NewValue>(
+    onResolved: ((Value) throws -> JSPromiseValue<NewValue>)? = nil,
+    onRejected: ((JSValue) throws -> JSPromiseValue<NewValue>)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(
+      NewValue.self,
+      onResolved: onResolved.map { onResolved in
+        return { try onResolved(Value(jsValue: $0)).jsValue(in: .current()) }
+      },
+      onRejected: onRejected.map { onRejected in
+        return { try onRejected($0).jsValue(in: .current()) }
+      }
+    )
+  }
+
+  /// Invokes `.then` on the promise.
+  ///
+  /// - Parameters:
+  ///   - type: The new value type of the transformed promise.
+  ///   - onResolved: A transform for the resolved value.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func then<NewValue>(
+    _ type: NewValue.Type,
+    onResolved: ((JSValue) throws -> JSValue)? = nil,
+    onRejected: ((JSValue) throws -> JSValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    let resolved = onResolved.map { onResolved in
+      let callback: @convention(block) (JSValue) -> JSValue = { jsValue in
+        tryJSOperation(in: .current()) { try onResolved(jsValue) }
+      }
+      return callback
+    }
+    let rejected = onRejected.map { onRejected in
+      let callback: @convention(block) (JSValue) -> JSValue = { jsValue in
+        tryJSOperation(in: .current()) { try onRejected(jsValue) }
+      }
+      return callback
+    }
+    let jsPromise = self._jsValue.invokeMethod(
+      "then",
+      withArguments: [
+        unsafeBitCast(resolved, to: JSValue.self),
+        unsafeBitCast(rejected, to: JSValue.self)
+      ]
+    )!
+    return JSPromiseValue<NewValue>(_jsValue: jsPromise)
+  }
+}
+
+// MARK: - Catch
+
+extension JSPromiseValue {
+  /// Invokes `.catch` on the promise.
+  ///
+  /// - Parameter onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func `catch`<NewValue>(
+    onRejected: ((JSValue) throws -> NewValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(onResolved: nil, onRejected: onRejected)
+  }
+
+  /// Invokes `.catch` on the promise.
+  ///
+  /// - Parameter onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func `catch`<NewValue>(
+    onRejected: ((JSValue) throws -> JSPromiseValue<NewValue>)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(onResolved: nil, onRejected: onRejected)
+  }
+
+  /// Invokes `.catch` on the promise.
+  ///
+  /// - Parameters:
+  ///   - type: The new value type of the transformed promise.
+  ///   - onRejected: A transform for the rejected reason.
+  /// - Returns: A transformed promise.
+  public func `catch`<NewValue>(
+    _ type: NewValue.Type,
+    onRejected: ((JSValue) throws -> JSValue)? = nil
+  ) -> JSPromiseValue<NewValue> {
+    self.then(type, onResolved: nil, onRejected: onRejected)
+  }
+}
+
+// MARK: - ConvertibleToJSValue
+
+extension JSPromiseValue: ConvertibleToJSValue {
+  public func jsValue(in context: JSContext) throws -> JSValue {
+    guard self._jsValue.context.virtualMachine === context.virtualMachine else {
+      throw JSDifferentVirtualMachinesError()
+    }
+    return self._jsValue
+  }
+}
+
+private struct JSDifferentVirtualMachinesError: Error {}
+
+// MARK: - ConvertibleFromJSValue
+
+extension JSPromiseValue: ConvertibleFromJSValue {
+  public init(jsValue: JSValue) throws {
+    guard jsValue.isPromise else { throw JSTypeMismatchError() }
+    self.init(_jsValue: jsValue)
+  }
+}
+
+// MARK: - Is Promise
+
+extension JSValue {
+  /// Whether or not this value is an instance of a Promise.
+  public var isPromise: Bool {
+    self.isInstanceOf(className: "Promise")
+  }
+}
+
+// MARK: - Helpers
+
+private func jsPromiseResolversMisuse() {
+  reportIssue(
+    """
+    A JSPromiseValue Resolvers instance was resolved or rejected more than once.
+
+    Resolving or rejecting more than once will have no effect on the resolved value or rejected \
+    reason.
+    """
+  )
+}
+
+private func jsPromiseNoCurrentExecutor() -> Never {
+  fatalError(
+    """
+    A JSPromiseValue was constructed on a thread without a current `JSVirtualMachineExecutor`.
+
+    An executor is required to ensure that the promise is resolved or rejected on the proper \
+    thread when performing asynchronous work inside the Promise.
+    """
+  )
+}
