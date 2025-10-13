@@ -173,7 +173,7 @@ extension JSValue {
   /// - Parameters:
   ///   - argumentTypes: The argument types.
   ///   - function: The function body.
-  ///   - key: The index.
+  ///   - index: The index.
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
@@ -193,7 +193,7 @@ extension JSValue {
   /// - Parameters:
   ///   - argumentTypes: The argument types.
   ///   - function: The function body.
-  ///   - key: The index.
+  ///   - index: The index.
   public func setFunction<each Arguments: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
@@ -244,7 +244,7 @@ extension JSContext {
   /// - Parameters:
   ///   - argumentTypes: The argument types.
   ///   - function: The function body.
-  ///   - key: The index.
+  ///   - index: The index.
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
@@ -258,7 +258,7 @@ extension JSContext {
   /// - Parameters:
   ///   - argumentTypes: The argument types.
   ///   - function: The function body.
-  ///   - key: The index.
+  ///   - index: The index.
   public func setFunction<each Arguments: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
