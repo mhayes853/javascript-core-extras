@@ -7,8 +7,15 @@ import IssueReporting
 public struct JSPromiseValue<Value: JSValueConvertible> {
   private let _jsValue: JSValue
 
-  private init(_jsValue: JSValue) {
+  /// The ``JSVirtualMachineExecutor`` used by this promise.
+  public let executor: JSVirtualMachineExecutor
+
+  private init(_jsValue: JSValue, executor: JSVirtualMachineExecutor? = .current()) {
     self._jsValue = _jsValue
+    guard let executor else {
+      jsPromiseNoCurrentExecutor()
+    }
+    self.executor = executor
   }
 }
 
@@ -41,7 +48,7 @@ extension JSPromiseValue where Value: Sendable {
     self.init(in: context) { resolvers in
       Task {
         do {
-          await resolvers.resolve(try await operation(resolvers.contextActor))
+          try await resolvers.resolve(operation(resolvers.contextActor))
         } catch {
           await resolvers.reject(error)
         }
@@ -93,15 +100,15 @@ extension JSPromiseValue where Value: Sendable {
 extension JSPromiseValue where Value: Sendable {
   /// A data type that enables resolving and rejecting a ``JSPromiseValue``.
   public struct Resolvers: Sendable {
-    let resolversActor:
-      JSActor<(resolve: JSValue, reject: JSValue, context: JSContext, didFinish: Bool)>
+    typealias State = (resolve: JSValue, reject: JSValue, context: JSContext, didFinish: Bool)
+    let resolversActor: JSActor<State>
     let contextActor: JSActor<JSContext>
 
     /// Resolves the promise with the specified `value`.
     ///
     /// - Parameter value: The value to resolve.
-    public func resolve(_ value: Value) async {
-      await self.finish(with: .success(value))
+    public func resolve(_ value: Value) async throws(Value.ToJSValueFailure) {
+      try await self.finish(with: .success(value))
     }
 
     /// Resolves the promise with the specified `value`.
@@ -109,6 +116,7 @@ extension JSPromiseValue where Value: Sendable {
     /// - Parameter value: The value to resolve.
     public func resolve(_ value: JSValue) async {
       await self.resolversActor.withIsolation { @Sendable resolversActor in
+        self.markFinished(state: &resolversActor.value)
         _ = resolversActor.value.resolve.call(withArguments: [value])
       }
     }
@@ -117,7 +125,7 @@ extension JSPromiseValue where Value: Sendable {
     ///
     /// - Parameter error: The error to reject with.
     public func reject(_ error: any Error) async {
-      await self.finish(with: .failure(error))
+      try! await self.finish(with: .failure(error))
     }
 
     /// Rejects the promise with the specified `error`.
@@ -125,6 +133,7 @@ extension JSPromiseValue where Value: Sendable {
     /// - Parameter error: The error to reject with.
     public func reject(_ error: JSValue) async {
       await self.resolversActor.withIsolation { @Sendable resolversActor in
+        self.markFinished(state: &resolversActor.value)
         _ = resolversActor.value.reject.call(withArguments: [error])
       }
     }
@@ -132,20 +141,28 @@ extension JSPromiseValue where Value: Sendable {
     /// Resolves or rejects the promise based on the specified `result`.
     ///
     /// - Parameter result: The result to finish the promise with.
-    public func finish(with result: Result<Value, any Error>) async {
-      await self.resolversActor.withIsolation { @Sendable resolversActor in
-        if resolversActor.value.didFinish {
-          jsPromiseResolversMisuse()
+    public func finish(
+      with result: Result<Value, any Error>
+    ) async throws(Value.ToJSValueFailure) {
+      try await self.resolversActor
+        .withIsolation { @Sendable resolversActor throws(Value.ToJSValueFailure) in
+          self.markFinished(state: &resolversActor.value)
+          switch result {
+          case .success(let value):
+            let jsValue = try value.jsValue(in: resolversActor.value.context)
+            resolversActor.value.resolve.call(withArguments: [jsValue])
+          case .failure(let error):
+            let jsValue = error._jsValue(in: resolversActor.value.context)
+            resolversActor.value.reject.call(withArguments: [jsValue])
+          }
         }
-        do {
-          let jsValue = try result.get().jsValue(in: resolversActor.value.context)
-          resolversActor.value.resolve.call(withArguments: [jsValue])
-        } catch {
-          let jsValue = error._jsValue(in: resolversActor.value.context)
-          resolversActor.value.reject.call(withArguments: [jsValue])
-        }
-        resolversActor.value.didFinish = true
+    }
+
+    private func markFinished(state: inout State) {
+      if state.didFinish {
+        jsPromiseResolversMisuse()
       }
+      state.didFinish = true
     }
 
     /// Allows access to the underlying `JSContext` of the promise.
@@ -159,18 +176,6 @@ extension JSPromiseValue where Value: Sendable {
         try operation(contextActor.value)
       }
     }
-
-    /// Allows access to the underlying `JSContext` of the promise.
-    ///
-    /// - Parameter operation: The operation to run with the context.
-    /// - Returns: Whatever `operation` returns.
-    public func withContext<T, E: Error>(
-      operation: @Sendable (JSContext) async throws(E) -> sending T
-    ) async throws(E) -> sending T {
-      try await contextActor.withIsolation { @Sendable contextActor async throws(E) in
-        try await operation(contextActor.value)
-      }
-    }
   }
 }
 
@@ -178,6 +183,8 @@ extension JSPromiseValue where Value: Sendable {
 
 extension JSPromiseValue {
   /// Creates a promise that resolves to the specified `value`.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
   ///
   /// - Parameters:
   ///   - value: The value to resolve.
@@ -192,6 +199,8 @@ extension JSPromiseValue {
 
   /// Creates a promise that resolves to the specified `value`.
   ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
+  ///
   /// - Parameters:
   ///   - value: The value to resolve.
   /// - Returns: A promise.
@@ -200,6 +209,8 @@ extension JSPromiseValue {
   }
 
   /// Creates a promise that rejects to the specified `error`.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
   ///
   /// - Parameters:
   ///   - error: The error to reject with.
@@ -210,6 +221,8 @@ extension JSPromiseValue {
   }
 
   /// Creates a promise that rejects to the specified `error`.
+  ///
+  /// > Warning: This method must be called on a thread with a current ``JSVirtualMachineExecutor``.
   ///
   /// - Parameters:
   ///   - error: The error to reject with.
@@ -229,7 +242,8 @@ extension JSPromiseValue where Value: Sendable {
   public func resolvedValue(
     isolation: isolated (any Actor)? = #isolation
   ) async throws -> Value {
-    try await Value(jsValue: self.resolvedJSvalue())
+    try await self.resolvedJSvalue(isolation: isolation)
+      .withIsolation { @Sendable in try Value(jsValue: $0.value) }
   }
 
   /// Waits for the resolved `JSValue` of this promise.
@@ -238,19 +252,23 @@ extension JSPromiseValue where Value: Sendable {
   /// - Returns: The resolved value.
   public func resolvedJSvalue(
     isolation: isolated (any Actor)? = #isolation
-  ) async throws -> JSValue {
+  ) async throws -> JSActor<JSValue> {
     try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
-      _ = self.then(
-        JSUndefinedValue.self,
-        onResolved: { value in
-          continuation.resume(returning: value)
-          return JSUndefinedValue().jsValue(in: .current())
-        },
-        onRejected: { error in
-          continuation.resume(throwing: JSError(onCurrentExecutor: error))
-          return JSUndefinedValue().jsValue(in: .current())
+      Task {
+        await self.executor.withVirtualMachine { _ in
+          _ = self.then(
+            JSUndefinedValue.self,
+            onResolved: { value in
+              continuation.resume(returning: JSActor(value, executor: self.executor))
+              return JSUndefinedValue().jsValue(in: .current())
+            },
+            onRejected: { error in
+              continuation.resume(throwing: JSError(onCurrentExecutor: error))
+              return JSUndefinedValue().jsValue(in: .current())
+            }
+          )
         }
-      )
+      }
     }
   }
 }
@@ -368,7 +386,7 @@ extension JSPromiseValue {
         unsafeBitCast(rejected, to: JSValue.self)
       ]
     )!
-    return JSPromiseValue<NewValue>(_jsValue: jsPromise)
+    return JSPromiseValue<NewValue>(_jsValue: jsPromise, executor: self.executor)
   }
 }
 
@@ -456,10 +474,11 @@ private func jsPromiseResolversMisuse() {
 private func jsPromiseNoCurrentExecutor() -> Never {
   fatalError(
     """
-    A JSPromiseValue was constructed on a thread without a current `JSVirtualMachineExecutor`.
+    A JSPromiseValue was constructed on a thread without a current running \
+    `JSVirtualMachineExecutor`.
 
-    An executor is required to ensure that the promise is resolved or rejected on the proper \
-    thread when performing asynchronous work inside the Promise.
+    A running executor is required to ensure that the promise is resolved or rejected on the \
+    proper thread when performing asynchronous work inside the Promise.
     """
   )
 }
