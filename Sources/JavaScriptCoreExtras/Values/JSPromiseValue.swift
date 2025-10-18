@@ -254,21 +254,17 @@ extension JSPromiseValue where Value: Sendable {
     isolation: isolated (any Actor)? = #isolation
   ) async throws -> JSActor<JSValue> {
     try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
-      Task {
-        await self.executor.withVirtualMachine { _ in
-          _ = self.then(
-            JSUndefinedValue.self,
-            onResolved: { value in
-              continuation.resume(returning: JSActor(value, executor: self.executor))
-              return JSUndefinedValue().jsValue(in: .current())
-            },
-            onRejected: { error in
-              continuation.resume(throwing: JSError(onCurrentExecutor: error))
-              return JSUndefinedValue().jsValue(in: .current())
-            }
-          )
+      _ = self.then(
+        JSUndefinedValue.self,
+        onResolved: { value in
+          continuation.resume(returning: JSActor(value, executor: self.executor))
+          return JSUndefinedValue().jsValue(in: .current())
+        },
+        onRejected: { error in
+          continuation.resume(throwing: JSError(onCurrentExecutor: error))
+          return JSUndefinedValue().jsValue(in: .current())
         }
-      }
+      )
     }
   }
 }
