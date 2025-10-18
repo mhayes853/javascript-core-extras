@@ -254,17 +254,21 @@ extension JSPromiseValue where Value: Sendable {
     isolation: isolated (any Actor)? = #isolation
   ) async throws -> JSActor<JSValue> {
     try await withUnsafeThrowingContinuation(isolation: isolation) { continuation in
-      _ = self.then(
-        JSUndefinedValue.self,
-        onResolved: { value in
-          continuation.resume(returning: JSActor(value, executor: self.executor))
-          return JSUndefinedValue().jsValue(in: .current())
-        },
-        onRejected: { error in
-          continuation.resume(throwing: JSError(onCurrentExecutor: error))
-          return JSUndefinedValue().jsValue(in: .current())
+      Task {
+        await self.executor.withVirtualMachine { _ in
+          _ = self.then(
+            JSUndefinedValue.self,
+            onResolved: { value in
+              continuation.resume(returning: JSActor(value, executor: self.executor))
+              return JSUndefinedValue().jsValue(in: .current())
+            },
+            onRejected: { error in
+              continuation.resume(throwing: JSError(onCurrentExecutor: error))
+              return JSUndefinedValue().jsValue(in: .current())
+            }
+          )
         }
-      )
+      }
     }
   }
 }
@@ -363,6 +367,9 @@ extension JSPromiseValue {
     onResolved: ((JSValue) throws -> JSValue)? = nil,
     onRejected: ((JSValue) throws -> JSValue)? = nil
   ) -> JSPromiseValue<NewValue> {
+    guard JSVirtualMachineExecutor.current() === self.executor else {
+      jsPromiseInvalidExecutor()
+    }
     let resolved = onResolved.map { onResolved in
       let callback: @convention(block) (JSValue) -> JSValue = { jsValue in
         tryJSOperation(in: .current()) { try onResolved(jsValue) }
@@ -475,6 +482,17 @@ private func jsPromiseNoCurrentExecutor() -> Never {
 
     A running executor is required to ensure that the promise is resolved or rejected on the \
     proper thread when performing asynchronous work inside the Promise.
+    """
+  )
+}
+
+private func jsPromiseInvalidExecutor() -> Never {
+  fatalError(
+    """
+    `.then` on a JSPromiseValue was invoked on different thread than its executor.
+
+    Since JSValue instances can only be accessed safely from the thread they were created on, \
+    `.then` must be invoked on the same thread as the executor.
     """
   )
 }
