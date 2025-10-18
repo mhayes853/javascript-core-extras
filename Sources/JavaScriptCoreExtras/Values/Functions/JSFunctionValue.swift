@@ -38,7 +38,7 @@ extension JSFunctionValue {
     _ argumentTypes: repeat (each Arguments).Type,
     function: @escaping (repeat (each Arguments)) throws -> Void
   ) where Value == JSUndefinedValue {
-    self.function = { (args: repeat (each Arguments)) in
+    self.init(repeat each argumentTypes) { (args: repeat (each Arguments)) in
       try function(repeat each args)
       return JSUndefinedValue()
     }

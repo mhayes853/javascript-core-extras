@@ -185,4 +185,77 @@ struct JSFunctionValueTests {
     }
     expectNoDifference(error?.valueActor == nil, true)
   }
+
+  @Test("Async Function")
+  func asyncFunction() async throws {
+    try await withContextActor { contextActor in
+      contextActor.value.setAsyncFunction(forKey: "work", Int.self) { contextActor, i in
+        i + 10
+      }
+      let promise = contextActor.value.evaluateScript(
+        """
+        work(100)
+        """
+      )!
+      let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+      let n = try await promiseValue.resolvedValue()
+      expectNoDifference(n, 110)
+    }
+  }
+
+  @Test("Async Function With No Arguments")
+  func asyncFunctionWithNoArguments() async throws {
+    try await withContextActor { contextActor in
+      contextActor.value.setAsyncFunction(forKey: "work") { _ in
+        110
+      }
+      let promise = contextActor.value.evaluateScript(
+        """
+        work()
+        """
+      )!
+      let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+      let n = try await promiseValue.resolvedValue()
+      expectNoDifference(n, 110)
+    }
+  }
+
+  @Test("Async Function Context Access")
+  func asyncFunctionWithContextAccess() async throws {
+    try await withContextActor { contextActor in
+      contextActor.value.setAsyncFunction(forKey: "work") { contextActor in
+        try await contextActor.withIsolation { @Sendable in
+          try $0.value.value(forKey: "value", as: Int.self)
+        }
+      }
+      let promise = contextActor.value.evaluateScript(
+        """
+        var value = 110
+        work()
+        """
+      )!
+      let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+      let n = try await promiseValue.resolvedValue()
+      expectNoDifference(n, 110)
+    }
+  }
+
+  @Test("Async Function Rejects When Error Thrown")
+  func asyncFunctionRejectsWhenErrorThrown() async throws {
+    struct SomeError: Error {}
+    try await withContextActor { contextActor in
+      contextActor.value.setAsyncFunction(forKey: "work") { _ in
+        throw SomeError()
+      }
+      let promise = contextActor.value.evaluateScript(
+        """
+        work()
+        """
+      )!
+      let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+      await #expect(throws: JSError.self) {
+        try await promiseValue.resolvedValue()
+      }
+    }
+  }
 }
