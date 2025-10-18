@@ -367,7 +367,7 @@ extension JSPromiseValue {
     onResolved: ((JSValue) throws -> JSValue)? = nil,
     onRejected: ((JSValue) throws -> JSValue)? = nil
   ) -> JSPromiseValue<NewValue> {
-    guard JSVirtualMachineExecutor.current() === self.executor else {
+    guard self._jsValue.isOnCurrentExecutor else {
       jsPromiseInvalidExecutor()
     }
     let resolved = onResolved.map { onResolved in
