@@ -37,6 +37,12 @@ public final actor JSActor<Value> {
   /// The executor of this actor.
   public let executor: JSVirtualMachineExecutor
 
+  /// The virtual machine held by the ``executor`` of this actor.
+  public var virtualMachine: JSVirtualMachine {
+    // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
+    JSVirtualMachine.threadLocal!
+  }
+
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
     self.executor.asUnownedSerialExecutor()
   }
@@ -97,18 +103,6 @@ public final actor JSActor<Value> {
     try operation(self)
   }
 
-  /// Performs an operation with isolated access to the value and `JSVirtualMachine` of
-  /// ``executor``.
-  ///
-  /// - Parameter operation: The operation.
-  /// - Returns: The result of the operation.
-  public func withIsolation<T, E: Error>(
-    perform operation: (isolated JSActor, JSVirtualMachine) throws(E) -> sending T
-  ) throws(E) -> sending T {
-    // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
-    try operation(self, JSVirtualMachine.threadLocal!)
-  }
-
   /// Performs an operation with isolated access to the value.
   ///
   /// - Parameter operation: The operation.
@@ -117,17 +111,5 @@ public final actor JSActor<Value> {
     perform operation: (isolated JSActor) async throws(E) -> sending T
   ) async throws(E) -> sending T {
     try await operation(self)
-  }
-
-  /// Performs an operation with isolated access to the value and `JSVirtualMachine` of
-  /// ``executor``.
-  ///
-  /// - Parameter operation: The operation.
-  /// - Returns: The result of the operation.
-  public func withIsolation<T, E: Error>(
-    perform operation: (isolated JSActor, JSVirtualMachine) async throws(E) -> sending T
-  ) async throws(E) -> sending T {
-    // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
-    try await operation(self, JSVirtualMachine.threadLocal!)
   }
 }

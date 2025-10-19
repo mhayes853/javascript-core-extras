@@ -21,8 +21,8 @@ struct JSContextActorTests {
     let e = await pool.executor()
     let context = await e.contextActor()
 
-    await context.withIsolation { @Sendable a, vm in
-      expectNoDifference(a.value.virtualMachine === vm, true)
+    await context.withIsolation { @Sendable a in
+      expectNoDifference(a.value.virtualMachine === a.virtualMachine, true)
     }
   }
 
