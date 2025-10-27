@@ -71,11 +71,13 @@ extension JSFunctionValue: ConvertibleToJSValue {
   }
 
   private var argsCount: Int {
-    var count = 0
-    for _ in repeat (each Arguments).self {
-      count += 1
+    // NB: An array of types prevents the loop from being optimized in release builds, which would
+    // always make the count 1.
+    var types = [Any.Type]()
+    for t in repeat (each Arguments).self {
+      types.append(t)
     }
-    return count
+    return types.count
   }
 }
 

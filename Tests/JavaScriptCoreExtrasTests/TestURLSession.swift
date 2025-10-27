@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCoreExtras
 
 // MARK: - ResponseBody
 
@@ -14,8 +15,8 @@ extension ResponseBody {
 extension ResponseBody {
   fileprivate func data() throws -> Data {
     switch self {
-    case let .data(data): data
-    case let .json(encodable): try JSONEncoder().encode(encodable)
+    case .data(let data): data
+    case .json(let encodable): try JSONEncoder().encode(encodable)
     }
   }
 }
@@ -37,9 +38,10 @@ func withTestURLSessionHandler<T: Sendable>(
 }
 
 func withTestURLSessionHandlerAndHeaders<T: Sendable>(
-  handler: @Sendable @escaping (URLRequest) async throws -> (
-    StatusCode, ResponseBody, [String: String]
-  ),
+  handler:
+    @Sendable @escaping (URLRequest) async throws -> (
+      StatusCode, ResponseBody, [String: String]
+    ),
   perform task: @Sendable @escaping (URLSession) async throws -> T
 ) async throws -> T {
   let configuration = URLSessionConfiguration.ephemeral
@@ -107,14 +109,30 @@ private final class TestURLProtocol: URLProtocol, @unchecked Sendable {
   }
 
   override func startLoading() {
+    let transfer = UnsafeTransfer(value: self)
+    self.load { result in
+      switch result {
+      case .success(let (response, data)):
+        transfer.value.client?
+          .urlProtocol(transfer.value, didReceive: response, cacheStoragePolicy: .notAllowed)
+        transfer.value.client?.urlProtocol(transfer.value, didLoad: data)
+        transfer.value.client?.urlProtocolDidFinishLoading(transfer.value)
+      case .failure(let error):
+        transfer.value.client?.urlProtocol(transfer.value, didFailWithError: error)
+      }
+    }
+  }
+
+  private func load(
+    completion: @escaping @Sendable (Result<(URLResponse, Data), any Error>) -> Void
+  ) {
+    let request = self.request
     Task {
       do {
         let (response, data) = try await TestURLSessionHandler.shared(request: request)
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: data)
-        client?.urlProtocolDidFinishLoading(self)
+        completion(.success((response, data)))
       } catch {
-        client?.urlProtocol(self, didFailWithError: error)
+        completion(.failure(error))
       }
     }
   }
