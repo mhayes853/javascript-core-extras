@@ -44,7 +44,7 @@ import Foundation
 public final class JSVirtualMachineExecutor: Sendable {
   private let createVirtualMachine: @Sendable () -> JSVirtualMachine
   private let runner = RecursiveLock<Runner?>(nil)
-  
+
   /// Creates an executor.
   ///
   /// - Parameter createVirtualMachine: A factory closure to create a `JSVirtualMachine` when
@@ -102,7 +102,7 @@ extension JSVirtualMachineExecutor {
     }
     CFRunLoopRun()
   }
-  
+
   /// Begins running this executor.
   ///
   /// This method creates a new dedicated thread with a run loop to schedule and execute work.
@@ -137,7 +137,7 @@ extension JSVirtualMachineExecutor {
       }
     }
   }
-  
+
   /// Stops running this executor.
   public func stop() {
     self.runner.withLock { runner in
@@ -204,7 +204,7 @@ extension JSVirtualMachineExecutor {
     }
     return try result.get()
   }
-  
+
   /// Synchronously accesses the `JSVirtualMachine` of this executor if this current executor is
   /// equivalent to the executor returned from ``current()``.
   ///
@@ -307,8 +307,8 @@ private func executorNotRunning() -> Never {
   fatalError(
     """
     JSVirtualMachineExecutor is not running. Call `run` or `runBlocking` to start it.
-    
-    If the executor was obtained from a JSVirtualMachineExecutorPool, ensure it hasn't been \ 
+
+    If the executor was obtained from a JSVirtualMachineExecutorPool, ensure it hasn't been \
     garbage collected.
     """
   )
