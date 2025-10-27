@@ -358,6 +358,9 @@ extension Decodable {
     guard let initializer = Self.self as? any ConvertibleFromJSValue.Type else {
       return nil
     }
-    self = try initializer.init(jsValue: jsValue) as! Self
+    func open<T: ConvertibleFromJSValue>(_ t: T.Type) throws -> T {
+      try t.init(jsValue: jsValue)
+    }
+    self = try open(initializer) as! Self
   }
 }

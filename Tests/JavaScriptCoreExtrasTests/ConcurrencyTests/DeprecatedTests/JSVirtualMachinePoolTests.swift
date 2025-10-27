@@ -3,9 +3,10 @@ import IssueReporting
 @preconcurrency import JavaScriptCoreExtras
 import Testing
 
-@Suite("JSVirtualMachinePool tests")
+@Suite("JSVirtualMachinePool tests", .disabled("Deprecated"))
 struct JSVirtualMachinePoolTests {
   @Test("Uses Same Virtual Machine For Contexts When Only 1 Machine Allowed")
+  @available(*, deprecated)
   func singleMachinePool() async {
     let pool = JSVirtualMachinePool(machines: 1)
     let (c1, c2) = await (JSContext(in: pool), JSContext(in: pool))
@@ -13,6 +14,7 @@ struct JSVirtualMachinePoolTests {
   }
 
   @Test("Performs A Round Robin When Pool Has Multiple Virtual Machines")
+  @available(*, deprecated)
   func roundRobin() async {
     let pool = JSVirtualMachinePool(machines: 3)
     let (c1, c2, c3, c4) = await (
@@ -25,6 +27,7 @@ struct JSVirtualMachinePoolTests {
   }
 
   @Test("Supports Custom Virtual Machines")
+  @available(*, deprecated)
   func customMachines() async {
     let pool = JSVirtualMachinePool(machines: 2) { CustomVM() }
     let (c1, c2) = await (JSContext(in: pool), JSContext(in: pool))
@@ -34,6 +37,7 @@ struct JSVirtualMachinePoolTests {
   }
 
   @Test("Allows Concurrent Execution With Separate Virtual Machines")
+  @available(*, deprecated)
   func concurrentExecution() async {
     let pool = JSVirtualMachinePool(machines: 2)
     let (c1, c2) = await (SendableContext(in: pool), SendableContext(in: pool))
@@ -81,6 +85,7 @@ struct JSVirtualMachinePoolTests {
   }
 
   @Test("Does Not Create More Threads Than Machines")
+  @available(*, deprecated)
   func doesNotCreateMoreThreadsThanMachines() async {
     let pool = JSVirtualMachinePool(machines: 1) { CustomVM() }
     await withTaskGroup(of: CustomVM.self) { group in
@@ -98,6 +103,7 @@ struct JSVirtualMachinePoolTests {
   }
 
   @Test("Garbage Collects Any Virtual Machine That Has No References")
+  @available(*, deprecated)
   func garbageCollection() async {
     let pool = JSVirtualMachinePool(machines: 3) { CounterVM() }
     let vm1 = await pool.virtualMachine()
@@ -147,6 +153,7 @@ private func expectDifferentVMs(_ c1: JSContext, _ c2: JSContext) {
 
 private final class SendableContext: JSContext, @unchecked Sendable {}
 
+@available(*, deprecated)
 extension JSContext {
   convenience init(in pool: JSVirtualMachinePool) async {
     await self.init(virtualMachine: pool.virtualMachine())
