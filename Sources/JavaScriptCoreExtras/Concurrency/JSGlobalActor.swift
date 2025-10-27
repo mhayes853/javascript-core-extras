@@ -52,13 +52,13 @@ public final actor JSGlobalActor {
     // NB: Since this actor executes on the virtual machine thread, unwrapping is fine.
     JSVirtualMachine.threadLocal!
   }
-  
+
   /// The ``JSVirtualMachineExecutor`` used by the JavaScript global actor.
   @JSGlobalActor
   public static var executor: JSVirtualMachineExecutor {
     Self.shared.executor
   }
-  
+
   /// Execute the given body closure on the JavaScript global actor.
   @JSGlobalActor
   public static func run<T, E: Error>(
