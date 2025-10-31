@@ -291,7 +291,7 @@ extension JSPromiseValue {
   /// - Returns: A transformed promise.
   public func then<NewValue>(
     onResolved: ((Value) throws -> NewValue)? = nil,
-    onRejected: ((JSValue) throws -> NewValue)? = nil,
+    onRejected: ((JSValue) throws -> NewValue)? = nil
   ) -> JSPromiseValue<NewValue> {
     self.then(
       onResolved: onResolved.map { onResolved in
