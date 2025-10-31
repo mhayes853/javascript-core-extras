@@ -53,7 +53,7 @@
       forKey key: Any,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value
     ) {
       self.set(
         value: JSFunctionValue<repeat (each Arguments), JSPromiseValue<Value>>
@@ -72,7 +72,7 @@
       forKey key: Any,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void
     ) {
       self.set(
         value: JSFunctionValue<repeat (each Arguments), JSPromiseValue<JSUndefinedValue>>
@@ -94,7 +94,7 @@
       atIndex index: Int,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value
     ) {
       self.set(
         value: JSFunctionValue<repeat (each Arguments), JSPromiseValue<Value>>
@@ -138,7 +138,7 @@
       forKey key: Any,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value
     ) {
       self.globalObject.setAsyncFunction(
         forKey: key,
@@ -157,7 +157,7 @@
       forKey key: Any,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void
     ) {
       self.globalObject.setAsyncFunction(
         forKey: key,
@@ -179,7 +179,7 @@
       atIndex index: Int,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Value
     ) {
       self.globalObject.setAsyncFunction(
         atIndex: index,
@@ -198,7 +198,7 @@
       atIndex index: Int,
       _ argumentTypes: repeat (each Arguments).Type,
       function:
-        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void,
+        @escaping @Sendable (JSActor<JSContext>, repeat (each Arguments)) async throws -> Void
     ) {
       self.globalObject.setAsyncFunction(
         atIndex: index,

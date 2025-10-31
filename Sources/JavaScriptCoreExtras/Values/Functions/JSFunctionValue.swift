@@ -139,7 +139,7 @@ extension JSValue {
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     forKey key: Any,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Value,
+    function: @escaping (repeat (each Arguments)) throws -> Value
   ) {
     self.set(
       value: JSFunctionValue<repeat (each Arguments), Value>(
@@ -159,7 +159,7 @@ extension JSValue {
   public func setFunction<each Arguments: JSValueConvertible>(
     forKey key: Any,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Void,
+    function: @escaping (repeat (each Arguments)) throws -> Void
   ) {
     self.set(
       value: JSFunctionValue<repeat (each Arguments), JSUndefinedValue>(
@@ -179,7 +179,7 @@ extension JSValue {
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Value,
+    function: @escaping (repeat (each Arguments)) throws -> Value
   ) {
     self.set(
       value: JSFunctionValue<repeat (each Arguments), Value>(
@@ -222,7 +222,7 @@ extension JSContext {
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     forKey key: Any,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Value,
+    function: @escaping (repeat (each Arguments)) throws -> Value
   ) {
     self.globalObject.setFunction(forKey: key, repeat (each argumentTypes), function: function)
   }
@@ -236,7 +236,7 @@ extension JSContext {
   public func setFunction<each Arguments: JSValueConvertible>(
     forKey key: Any,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Void,
+    function: @escaping (repeat (each Arguments)) throws -> Void
   ) {
     self.globalObject.setFunction(forKey: key, repeat (each argumentTypes), function: function)
   }
@@ -250,7 +250,7 @@ extension JSContext {
   public func setFunction<each Arguments: JSValueConvertible, Value: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Value,
+    function: @escaping (repeat (each Arguments)) throws -> Value
   ) {
     self.globalObject.setFunction(atIndex: index, repeat (each argumentTypes), function: function)
   }
@@ -264,7 +264,7 @@ extension JSContext {
   public func setFunction<each Arguments: JSValueConvertible>(
     atIndex index: Int,
     _ argumentTypes: repeat (each Arguments).Type,
-    function: @escaping (repeat (each Arguments)) throws -> Void,
+    function: @escaping (repeat (each Arguments)) throws -> Void
   ) {
     self.globalObject.setFunction(atIndex: index, repeat (each argumentTypes), function: function)
   }
