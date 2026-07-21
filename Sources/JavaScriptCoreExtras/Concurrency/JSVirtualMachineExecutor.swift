@@ -94,12 +94,13 @@ extension JSVirtualMachineExecutor {
   ///
   /// > Warning: This will indefinitely block the current thread of execution until ``stop()`` is
   /// > explicitly called. Use ``run()`` if you do not want to block the current thread.
-  public func runBlocking() {
+  public func runBlocking(onStart: (@Sendable () -> Void)? = nil) {
     self.runner.withLock {
       $0 = Runner()
       Self.threadLocal = WeakBox(value: self)
       JSVirtualMachine.threadLocal = self.createVirtualMachine()
     }
+    onStart?()
     CFRunLoopRun()
   }
 
