@@ -84,15 +84,16 @@ public final actor JSGlobalActor {
 extension JSVirtualMachineExecutor {
   fileprivate func blockUntilStartsRunning() {
     let condition = NSCondition()
-    condition.lock()
 
     Thread.detachNewThread { [weak self] in
-      condition.lock()
-      condition.signal()
-      condition.unlock()
-      self?.runBlocking()
+      self?.runBlocking {
+        condition.lock()
+        condition.signal()
+        condition.unlock()
+      }
     }
 
+    condition.lock()
     condition.wait()
     condition.unlock()
   }

@@ -93,20 +93,20 @@ extension JSVirtualMachineExecutorPool {
         } else {
           self.isCreatingMachineCondition = true
           Thread.detachNewThread {
-            self.condition.lock()
-            let executor = self.state.withLock { state in
-              let executor = JSVirtualMachineExecutor(
-                createVirtualMachine: self.createVirtualMachine
-              )
-              state.cells[state.index] = ExecutorCell(referenceCount: 1, executor: executor)
-              state.index = self.nextCellIndex(in: state)
-              return executor
+            let executor = JSVirtualMachineExecutor(
+              createVirtualMachine: self.createVirtualMachine
+            )
+            executor.runBlocking {
+              self.condition.lock()
+              self.state.withLock { state in
+                state.cells[state.index] = ExecutorCell(referenceCount: 1, executor: executor)
+                state.index = self.nextCellIndex(in: state)
+              }
+              continuation.resume(returning: executor)
+              self.isCreatingMachineCondition = false
+              self.condition.signal()
+              self.condition.unlock()
             }
-            continuation.resume(returning: executor)
-            self.isCreatingMachineCondition = false
-            self.condition.signal()
-            self.condition.unlock()
-            executor.runBlocking()
           }
         }
       }
