@@ -99,10 +99,11 @@ extension JSContextInstallable where Self == JSFetchInstaller {
 extension JSFetchTask: JSFetchTaskExport {
   func perform() -> JSValue {
     JSPromise(in: .current()) { continuation in
+      let executor = JSVirtualMachineExecutor.current()
       self.state.withLock { state in
         let task = state.task ?? self.session.dataTask(with: self.request)
         state.task = task
-        state.delegate.addFetchContinuation(continuation, for: task.taskIdentifier)
+        state.delegate.addFetchContinuation(continuation, executor: executor, for: task.taskIdentifier)
         guard !state.delegate.rejectIfCancelled(for: task.taskIdentifier) else { return }
         if #available(iOS 15, macOS 12, tvOS 15, watchOS 8, *), !state.delegate.isShared {
           task.delegate = state.delegate
@@ -135,6 +136,7 @@ private final class JSURLSessionDataDelegate: NSObject {
     var didRedirect = false
     var continuation: JSPromise.Continuation?
     var response: HTTPURLResponse?
+    var executor: JSVirtualMachineExecutor?
   }
 
   let isShared: Bool
@@ -146,8 +148,15 @@ private final class JSURLSessionDataDelegate: NSObject {
 }
 
 extension JSURLSessionDataDelegate {
-  func addFetchContinuation(_ continuation: JSPromise.Continuation, for taskId: TaskID) {
-    self.editState(for: taskId) { $0.continuation = continuation }
+  func addFetchContinuation(
+    _ continuation: JSPromise.Continuation,
+    executor: JSVirtualMachineExecutor?,
+    for taskId: TaskID
+  ) {
+    self.editState(for: taskId) {
+      $0.continuation = continuation
+      $0.executor = executor
+    }
   }
 
   func markCancelReason(reason: UnsafeJSValueTransfer, for taskId: TaskID) {
@@ -175,12 +184,25 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
     self.editState(for: dataTask.taskIdentifier) { state in
       guard let continuation = state.continuation else { return }
       guard let response = response as? HTTPURLResponse else {
-        continuation.resume(
-          rejecting: JSValue(
-            newErrorFromMessage: "Server responded with a non-HTTP response.",
-            in: continuation.context
+        if let executor = state.executor {
+          Task {
+            await executor.withVirtualMachine { _ in
+              continuation.resume(
+                rejecting: JSValue(
+                  newErrorFromMessage: "Server responded with a non-HTTP response.",
+                  in: continuation.context
+                )
+              )
+            }
+          }
+        } else {
+          continuation.resume(
+            rejecting: JSValue(
+              newErrorFromMessage: "Server responded with a non-HTTP response.",
+              in: continuation.context
+            )
           )
-        )
+        }
         return
       }
       let (cookies, _) = response.cookieFilteredHeaders
@@ -233,17 +255,32 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
 
   private func resolveError(in state: inout State, error: any Error) {
     guard let continuation = state.continuation else { return }
-    if let error = error as? URLError, error.code == .cancelled {
-      continuation.resume(rejecting: state.cancelReason)
-    } else {
-      continuation.resume(
-        rejecting: JSValue(
-          newErrorFromMessage: error.localizedDescription,
-          in: continuation.context
-        )
-      )
-    }
+    let executor = state.executor
+    let cancelReason = state.cancelReason
+    let isCancelled = (error as? URLError)?.code == .cancelled
+    let errorMessage = error.localizedDescription
     state.didResolveResponse = true
+    if let executor {
+      Task {
+        await executor.withVirtualMachine { _ in
+          if isCancelled {
+            continuation.resume(rejecting: cancelReason)
+          } else {
+            continuation.resume(
+              rejecting: JSValue(newErrorFromMessage: errorMessage, in: continuation.context)
+            )
+          }
+        }
+      }
+    } else {
+      if isCancelled {
+        continuation.resume(rejecting: cancelReason)
+      } else {
+        continuation.resume(
+          rejecting: JSValue(newErrorFromMessage: errorMessage, in: continuation.context)
+        )
+      }
+    }
   }
 
   private func resolveResponse(task: URLSessionTask) async {
@@ -264,16 +301,36 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
   ) {
     guard let response = state.response, let continuation = state.continuation else { return }
     let (_, headers) = response.cookieFilteredHeaders
-    continuation.resume(
-      resolving: JSValue.response(
-        response: response,
-        headers: headers,
-        body: storage,
-        didRedirect: state.didRedirect,
-        in: continuation.context
-      )
-    )
+    let didRedirect = state.didRedirect
+    let executor = state.executor
     state.didResolveResponse = true
+    nonisolated(unsafe) let capturedHeaders = headers
+    nonisolated(unsafe) let capturedStorage = storage
+    if let executor {
+      Task {
+        await executor.withVirtualMachine { _ in
+          continuation.resume(
+            resolving: JSValue.response(
+              response: response,
+              headers: capturedHeaders,
+              body: capturedStorage,
+              didRedirect: didRedirect,
+              in: continuation.context
+            )
+          )
+        }
+      }
+    } else {
+      continuation.resume(
+        resolving: JSValue.response(
+          response: response,
+          headers: capturedHeaders,
+          body: capturedStorage,
+          didRedirect: didRedirect,
+          in: continuation.context
+        )
+      )
+    }
   }
 }
 
