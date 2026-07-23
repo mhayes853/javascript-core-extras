@@ -701,6 +701,35 @@ struct JSFetchTests: @unchecked Sendable {
     expectNoDifference(value?.toString(), "hello world")
   }
 
+  @Test("Resolves Async Function After Fetch Without Executor Crash")
+  @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
+  func asyncFunctionAfterFetchDoesNotCrash() async throws {
+    try await withTestURLSessionHandler { _ in
+      return (200, .data(Data("ok".utf8)))
+    } perform: { session in
+      try await withContextActor { contextActor in
+        let context = contextActor.value
+        try context.install([.fetch(session: session)])
+        context.setAsyncFunction(forKey: "addOne", Int.self) { _, i in
+          i + 1
+        }
+        let promise = context
+          .evaluateScript(
+            """
+            const run = async () => {
+              const resp = await fetch("https://www.example.com")
+              return addOne(41)
+            }
+            run()
+            """
+          )!
+        let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+        let value = try await promiseValue.resolvedValue()
+        expectNoDifference(value, 42)
+      }
+    }
+  }
+
   @Test("Live Fetches a Large Data Payload")
   func liveFetchLarge() async throws {
     try self.context.install([.fetch])
