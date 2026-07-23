@@ -150,4 +150,31 @@ struct JSBlobTests {
       expectNoDifference(Set(values), ["foobar", "oob", "oobar", "test", "", "o"])
     }
   }
+
+  #if swift(>=6.2)
+    @Test("Resolves Async Function After Blob Text Without Executor Crash")
+    func asyncFunctionAfterBlobTextDoesNotCrash() async throws {
+      try await withContextActor { contextActor in
+        let context = contextActor.value
+        try context.install([.blob])
+        context.setAsyncFunction(forKey: "addOne", Int.self) { _, i in
+          i + 1
+        }
+        let promise = context
+          .evaluateScript(
+            """
+            const run = async () => {
+              const blob = new Blob(["hello"])
+              await blob.text()
+              return addOne(41)
+            }
+            run()
+            """
+          )!
+        let promiseValue = try JSPromiseValue<Int>(jsValue: promise)
+        let value = try await promiseValue.resolvedValue()
+        expectNoDifference(value, 42)
+      }
+    }
+  #endif
 }
