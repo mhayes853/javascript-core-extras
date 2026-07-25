@@ -156,8 +156,9 @@ extension JSBlob: JSBlobExport {
     _ map: @Sendable @escaping (String.UTF8View, JSContext) -> Any?
   ) -> JSPromise {
     JSPromise(in: .current()) { continuation in
+      let executor = JSVirtualMachineExecutor.current()
       let indexedStorage = self.indexedStorage
-      Task { await indexedStorage.utf8(continuation: continuation, map) }
+      Task { await indexedStorage.utf8(continuation: continuation, executor: executor, map) }
     }
   }
 }
@@ -180,14 +181,27 @@ extension JSBlob {
 
     func utf8(
       continuation: JSPromise.Continuation,
+      executor: JSVirtualMachineExecutor?,
       _ map: (String.UTF8View, JSContext) -> Any?
     ) async {
       do {
-        continuation.resume(
-          resolving: map(try await self.utf8(context: continuation.context), continuation.context)
-        )
+        let result = map(try await self.utf8(context: continuation.context), continuation.context)
+        if let executor {
+          nonisolated(unsafe) let capturedResult = result
+          await executor.withVirtualMachine { _ in
+            continuation.resume(resolving: capturedResult)
+          }
+        } else {
+          continuation.resume(resolving: result)
+        }
       } catch {
-        continuation.resume(rejecting: error.value)
+        if let executor {
+          await executor.withVirtualMachine { _ in
+            continuation.resume(rejecting: error.value)
+          }
+        } else {
+          continuation.resume(rejecting: error.value)
+        }
       }
     }
   }
