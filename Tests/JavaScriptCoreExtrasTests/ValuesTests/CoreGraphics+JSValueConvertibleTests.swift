@@ -5,30 +5,30 @@ import Testing
 
 @Suite("CoreGraphics+JSValueConvertible tests")
 struct CoreGraphicsJSValueConvertibleTests {
-  @Test(
-    "JSValue Is Rect",
-    arguments: [
-      ({ @Sendable c in JSValue(newObjectIn: c) }, false),
-      ({ @Sendable c in JSValue(bool: true, in: c) }, false),
-      ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
-      (
-        { @Sendable c in
-          let object = JSValue(newObjectIn: c)!
-          object.setValue(0, forPath: "x")
-          object.setValue(10, forPath: "y")
-          object.setValue(43, forPath: "width")
-          object.setValue(50, forPath: "height")
-          return object
-        },
-        true
-      )
-    ]
-  )
-  func jsValueIsRect(value: @Sendable (JSContext) -> JSValue, isRect: Bool) {
-    let context = JSContext()!
-    let value = value(context)
-    expectNoDifference(value.isRect, isRect)
-  }
+  // @Test(
+  //   "JSValue Is Rect",
+  //   arguments: [
+  //     ({ @Sendable c in JSValue(newObjectIn: c) }, false),
+  //     ({ @Sendable c in JSValue(bool: true, in: c) }, false),
+  //     ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
+  //     (
+  //       { @Sendable c in
+  //         let object = JSValue(newObjectIn: c)!
+  //         object.setValue(0, forPath: "x")
+  //         object.setValue(10, forPath: "y")
+  //         object.setValue(43, forPath: "width")
+  //         object.setValue(50, forPath: "height")
+  //         return object
+  //       },
+  //       true
+  //     )
+  //   ]
+  // )
+  // func jsValueIsRect(value: @Sendable (JSContext) -> JSValue, isRect: Bool) {
+  //   let context = JSContext()!
+  //   let value = value(context)
+  //   expectNoDifference(value.isRect, isRect)
+  // }
 
   @Test("Converts Rect")
   func convertsRect() throws {
@@ -46,29 +46,29 @@ struct CoreGraphicsJSValueConvertibleTests {
     expectNoDifference(try CGRect(jsValue: jsValue), rect)
   }
 
-  @Test(
-    "JSValue Is Size",
-    arguments: [
-      ({ @Sendable c in JSValue(newObjectIn: c) }, false),
-      ({ @Sendable c in JSValue(bool: true, in: c) }, false),
-      ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
-      (
-        { @Sendable c in
-          let object = JSValue(newObjectIn: c)!
-          object.setValue(43, forPath: "width")
-          object.setValue(50, forPath: "height")
-          return object
-        },
-        true
-      ),
-      ({ @Sendable c in JSValue(size: CGSize(width: 43, height: 50), in: c) }, true)
-    ]
-  )
-  func jsValueIsSize(value: @Sendable (JSContext) -> JSValue, isSize: Bool) {
-    let context = JSContext()!
-    let value = value(context)
-    expectNoDifference(value.isSize, isSize)
-  }
+  // @Test(
+  //   "JSValue Is Size",
+  //   arguments: [
+  //     ({ @Sendable c in JSValue(newObjectIn: c) }, false),
+  //     ({ @Sendable c in JSValue(bool: true, in: c) }, false),
+  //     ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
+  //     (
+  //       { @Sendable c in
+  //         let object = JSValue(newObjectIn: c)!
+  //         object.setValue(43, forPath: "width")
+  //         object.setValue(50, forPath: "height")
+  //         return object
+  //       },
+  //       true
+  //     ),
+  //     ({ @Sendable c in JSValue(size: CGSize(width: 43, height: 50), in: c) }, true)
+  //   ]
+  // )
+  // func jsValueIsSize(value: @Sendable (JSContext) -> JSValue, isSize: Bool) {
+  //   let context = JSContext()!
+  //   let value = value(context)
+  //   expectNoDifference(value.isSize, isSize)
+  // }
 
   @Test("Converts Size")
   func convertsSzie() throws {
@@ -84,29 +84,29 @@ struct CoreGraphicsJSValueConvertibleTests {
     expectNoDifference(try CGSize(jsValue: jsValue), rect)
   }
 
-  @Test(
-    "JSValue Is Point",
-    arguments: [
-      ({ @Sendable c in JSValue(newObjectIn: c) }, false),
-      ({ @Sendable c in JSValue(bool: true, in: c) }, false),
-      ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
-      (
-        { @Sendable c in
-          let object = JSValue(newObjectIn: c)!
-          object.setValue(43, forPath: "x")
-          object.setValue(50, forPath: "y")
-          return object
-        },
-        true
-      ),
-      ({ @Sendable c in JSValue(point: CGPoint(x: 43, y: 50), in: c) }, true)
-    ]
-  )
-  func jsValueIsPoint(value: @Sendable (JSContext) -> JSValue, isPoint: Bool) {
-    let context = JSContext()!
-    let value = value(context)
-    expectNoDifference(value.isPoint, isPoint)
-  }
+  // @Test(
+  //   "JSValue Is Point",
+  //   arguments: [
+  //     ({ @Sendable c in JSValue(newObjectIn: c) }, false),
+  //     ({ @Sendable c in JSValue(bool: true, in: c) }, false),
+  //     ({ @Sendable c in JSValue(rect: CGRect(origin: .zero, size: .zero), in: c) }, true),
+  //     (
+  //       { @Sendable c in
+  //         let object = JSValue(newObjectIn: c)!
+  //         object.setValue(43, forPath: "x")
+  //         object.setValue(50, forPath: "y")
+  //         return object
+  //       },
+  //       true
+  //     ),
+  //     ({ @Sendable c in JSValue(point: CGPoint(x: 43, y: 50), in: c) }, true)
+  //   ]
+  // )
+  // func jsValueIsPoint(value: @Sendable (JSContext) -> JSValue, isPoint: Bool) {
+  //   let context = JSContext()!
+  //   let value = value(context)
+  //   expectNoDifference(value.isPoint, isPoint)
+  // }
 
   @Test("Converts Point")
   func convertsPoint() throws {

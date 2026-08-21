@@ -268,6 +268,25 @@ struct JSFormDataTests {
     expectNoDifference(v3.toString(), "test")
   }
 
+  @Test("For Each 2 Args")
+  func forEach2Args() async throws {
+    let value = self.context.evaluateScript(
+      """
+      const results = []
+      const data = new FormData()
+      data.set("bar", "test")
+      data.forEach((a1, a2) => {
+        results.push(a1)
+        results.push(a2)
+      })
+      results
+      """
+    )
+    let (v1, v2) = (value!.atIndex(0)!, value!.atIndex(1)!)
+    expectNoDifference(v1.toString(), "test")
+    expectNoDifference(v2.toString(), "bar")
+  }
+
   @Test("Cannot Set Filename on Non-Blob")
   func cannotSetFilenameNonBlob() async {
     await confirmation { confirm in

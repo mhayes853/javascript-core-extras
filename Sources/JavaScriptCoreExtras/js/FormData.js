@@ -33,8 +33,8 @@ Object.defineProperties(FormData.prototype, {
         "parameter 1 is not of type 'Function'.",
       );
     }
-    for (const [_, value] of this.entries()) {
-      fn(value);
+    for (const [key, value] of this.entries()) {
+      fn(value, key);
     }
   }),
   keys: _jsCoreExtrasFunctionProperty(function* () {
