@@ -76,12 +76,13 @@ struct JSFetchTests: @unchecked Sendable {
   @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
   func pushesHeaders() async throws {
     let expectedHeaders = [
-      "content-type": "application/json",
-      "authorization": "bearer token",
-      "foo": "Bar,Baz"
+      "Authorization": "bearer token",
+      "Content-Type": "application/json",
+      "foo": "Bar, Baz"
     ]
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.allHTTPHeaderFields, expectedHeaders)
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -101,13 +102,17 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.allHTTPHeaderFields, expectedHeaders)
   }
 
   @Test("Uses Correct Request Method By Default")
   @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
   func usesCorrectDefaultMethod() async throws {
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.httpMethod, "GET")
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -122,13 +127,17 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.httpMethod, "GET")
   }
 
   @Test("Uses Correct Request Method")
   @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
   func usesCorrectSpecifiedMethod() async throws {
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.httpMethod, "POST")
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -143,14 +152,18 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.httpMethod, "POST")
   }
 
   @Test("Pushes Body")
   @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
   func pushesBody() async throws {
-    let expectedBodyData = try JSONEncoder().encode(TestBody(a: "Test", b: 42))
+    let expectedBodyData = Data("{\"a\":\"Test\",\"b\":42}".utf8)
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.httpBody, expectedBodyData)
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -168,14 +181,18 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.bodyData, expectedBodyData)
   }
 
   @Test("Pushes JS File Body as Raw Data")
   @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
   func pushesJSFileBody() async throws {
-    let expectedBodyData = try JSONEncoder().encode(TestBody(a: "Test", b: 42))
+    let expectedBodyData = Data("{\"a\":\"Test\",\"b\":42}".utf8)
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.httpBody, expectedBodyData)
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -193,6 +210,9 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.bodyData, expectedBodyData)
   }
 
   @Test("Pushes Native File Body as Data")
@@ -201,8 +221,9 @@ struct JSFetchTests: @unchecked Sendable {
     let url = URL.temporaryDirectory.appending(path: "\(UUID()).json")
     let expectedBodyData = try JSONEncoder().encode(TestBody(a: "Test", b: 42))
     try expectedBodyData.write(to: url)
+    let receivedRequest = Lock<URLRequest?>(nil)
     try await withTestURLSessionHandler { request in
-      expectNoDifference(request.httpBody, expectedBodyData)
+      receivedRequest.withLock { $0 = request }
       return (200, .empty)
     } perform: { session in
       try self.context.install([.fetch(session: session)])
@@ -218,6 +239,9 @@ struct JSFetchTests: @unchecked Sendable {
       let value = try await promise?.resolvedValue
       expectNoDifference(value?.objectForKeyedSubscript("status").toInt32(), 200)
     }
+
+    let request = try #require(receivedRequest.withLock { $0 })
+    expectNoDifference(request.bodyData, expectedBodyData)
   }
 
   @Test("Throws Error When Invalid URL")
@@ -871,4 +895,29 @@ private final class NonHTTPResponseProtocol: URLProtocol {
 private struct TestBody: Codable {
   let a: String
   let b: Int32
+}
+
+extension URLRequest {
+  /// The request body, reading from `httpBodyStream` when `httpBody` is `nil`.
+  ///
+  /// `URLSession` converts `httpBody` into `httpBodyStream` before handing the
+  /// request to a `URLProtocol`, so tests must read from the stream to observe
+  /// the body.
+  fileprivate var bodyData: Data? {
+    if let httpBody {
+      return httpBody
+    }
+    guard let stream = self.httpBodyStream else { return nil }
+    stream.open()
+    defer { stream.close() }
+    var data = Data()
+    let bufferSize = 1024
+    var buffer = [UInt8](repeating: 0, count: bufferSize)
+    while stream.hasBytesAvailable {
+      let count = stream.read(&buffer, maxLength: bufferSize)
+      guard count > 0 else { break }
+      data.append(buffer, count: count)
+    }
+    return data
+  }
 }

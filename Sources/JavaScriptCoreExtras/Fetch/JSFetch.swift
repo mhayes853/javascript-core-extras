@@ -435,8 +435,8 @@ extension URLRequest {
     if let cookies = cookieStorage?.cookies(for: url), requestCopy.httpShouldHandleCookies {
       requestCopy.allHTTPHeaderFields = HTTPCookie.requestHeaderFields(with: cookies)
     }
-    let onEach: @convention(block) (JSValue) -> Void = {
-      requestCopy.addValue($0.atIndex(1).toString(), forHTTPHeaderField: $0.atIndex(0).toString())
+    let onEach: @convention(block) (JSValue, JSValue) -> Void = { value, key in
+      requestCopy.addValue(value.toString(), forHTTPHeaderField: key.toString())
     }
     request.objectForKeyedSubscript("headers")
       .invokeMethod("forEach", withArguments: [unsafeBitCast(onEach, to: JSValue.self)])

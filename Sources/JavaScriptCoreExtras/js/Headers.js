@@ -66,8 +66,8 @@ Object.defineProperties(Headers.prototype, {
         "parameter 1 is not of type 'Function'.",
       );
     }
-    for (const [_, value] of this.entries()) {
-      fn(value);
+    for (const [key, value] of this.entries()) {
+      fn(value, key);
     }
   }),
   has: _jsCoreExtrasFunctionProperty(function (key) {
