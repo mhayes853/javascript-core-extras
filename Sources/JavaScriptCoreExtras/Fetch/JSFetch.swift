@@ -100,10 +100,16 @@ extension JSFetchTask: JSFetchTaskExport {
   func perform() -> JSValue {
     JSPromise(in: .current()) { continuation in
       let executor = JSVirtualMachineExecutor.current()
+      let resumeFallback = RunLoopFallbackContext()
       self.state.withLock { state in
         let task = state.task ?? self.session.dataTask(with: self.request)
         state.task = task
-        state.delegate.addFetchContinuation(continuation, executor: executor, for: task.taskIdentifier)
+        state.delegate.addFetchContinuation(
+          continuation,
+          executor: executor,
+          resumeFallback: resumeFallback,
+          for: task.taskIdentifier
+        )
         guard !state.delegate.rejectIfCancelled(for: task.taskIdentifier) else { return }
         if #available(iOS 15, macOS 12, tvOS 15, watchOS 8, *), !state.delegate.isShared {
           task.delegate = state.delegate
@@ -137,6 +143,7 @@ private final class JSURLSessionDataDelegate: NSObject {
     var continuation: JSPromise.Continuation?
     var response: HTTPURLResponse?
     var executor: JSVirtualMachineExecutor?
+    var resumeFallback: RunLoopFallbackContext?
   }
 
   let isShared: Bool
@@ -151,11 +158,13 @@ extension JSURLSessionDataDelegate {
   func addFetchContinuation(
     _ continuation: JSPromise.Continuation,
     executor: JSVirtualMachineExecutor?,
+    resumeFallback: RunLoopFallbackContext,
     for taskId: TaskID
   ) {
     self.editState(for: taskId) {
       $0.continuation = continuation
       $0.executor = executor
+      $0.resumeFallback = resumeFallback
     }
   }
 
@@ -196,12 +205,14 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
             }
           }
         } else {
-          continuation.resume(
-            rejecting: JSValue(
-              newErrorFromMessage: "Server responded with a non-HTTP response.",
-              in: continuation.context
+          state.resumeFallback?.perform {
+            continuation.resume(
+              rejecting: JSValue(
+                newErrorFromMessage: "Server responded with a non-HTTP response.",
+                in: continuation.context
+              )
             )
-          )
+          }
         }
         return
       }
@@ -256,6 +267,7 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
   private func resolveError(in state: inout State, error: any Error) {
     guard let continuation = state.continuation else { return }
     let executor = state.executor
+    let resumeFallback = state.resumeFallback
     let cancelReason = state.cancelReason
     let isCancelled = (error as? URLError)?.code == .cancelled
     let errorMessage = error.localizedDescription
@@ -273,12 +285,14 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
         }
       }
     } else {
-      if isCancelled {
-        continuation.resume(rejecting: cancelReason)
-      } else {
-        continuation.resume(
-          rejecting: JSValue(newErrorFromMessage: errorMessage, in: continuation.context)
-        )
+      resumeFallback?.perform {
+        if isCancelled {
+          continuation.resume(rejecting: cancelReason)
+        } else {
+          continuation.resume(
+            rejecting: JSValue(newErrorFromMessage: errorMessage, in: continuation.context)
+          )
+        }
       }
     }
   }
@@ -303,6 +317,7 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
     let (_, headers) = response.cookieFilteredHeaders
     let didRedirect = state.didRedirect
     let executor = state.executor
+    let resumeFallback = state.resumeFallback
     state.didResolveResponse = true
     nonisolated(unsafe) let capturedHeaders = headers
     nonisolated(unsafe) let capturedStorage = storage
@@ -321,15 +336,17 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
         }
       }
     } else {
-      continuation.resume(
-        resolving: JSValue.response(
-          response: response,
-          headers: capturedHeaders,
-          body: capturedStorage,
-          didRedirect: didRedirect,
-          in: continuation.context
+      resumeFallback?.perform {
+        continuation.resume(
+          resolving: JSValue.response(
+            response: response,
+            headers: capturedHeaders,
+            body: capturedStorage,
+            didRedirect: didRedirect,
+            in: continuation.context
+          )
         )
-      )
+      }
     }
   }
 }
