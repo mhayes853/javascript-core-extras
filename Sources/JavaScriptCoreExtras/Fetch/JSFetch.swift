@@ -57,7 +57,7 @@ extension JSContextInstallable where Self == JSFetchInstaller {
       session: URLSession(
         configuration: sessionConfiguration,
         delegate: JSURLSessionDataDelegate(isShared: true),
-        delegateQueue: nil
+        delegateQueue: .current
       )
     )
   }
