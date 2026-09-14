@@ -1,4 +1,5 @@
 import CustomDump
+import Foundation
 import IssueReporting
 import JavaScriptCoreExtras
 import SnapshotTesting
@@ -754,6 +755,52 @@ struct JSFetchTests: @unchecked Sendable {
     }
   }
 
+  @Test("Resolves Fetch Continuation On The Initiating Thread When Used Without an Executor")
+  @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
+  func fetchWithoutExecutorResolvesOnInitiatingThread() async throws {
+    try await withTestURLSessionHandler { _ in
+      return (200, .data(Data("hello world".utf8)))
+    } perform: { session in
+      let resolvedOnInitiatingThread = try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<Bool, Error>) in
+        Thread {
+            let initiatingThread = Thread.current
+          let context = JSContext()!
+          do {
+            try context.install([.fetch(session: session)])
+          } catch {
+            continuation.resume(throwing: error)
+            return
+          }
+          guard
+            let promise = context
+              .evaluateScript(
+                """
+                fetch("https://www.example.com").then((resp) => resp.text())
+                """
+              )?
+              .toPromise()
+          else {
+            continuation.resume(throwing: UnavailablePromiseError())
+            return
+          }
+          promise.then { value in
+            continuation.resume(returning: Thread.current === initiatingThread)
+            CFRunLoopStop(CFRunLoopGetCurrent())
+            return JSValue(undefinedIn: value.context)
+          } onRejected: { error in
+            continuation.resume(throwing: JSPromiseRejectedError(reason: error))
+            CFRunLoopStop(CFRunLoopGetCurrent())
+            return JSValue(undefinedIn: error.context)
+          }
+          CFRunLoopRun()
+        }
+        .start()
+      }
+      expectNoDifference(resolvedOnInitiatingThread, true)
+    }
+  }
+
   @Test("Live Fetches a Large Data Payload")
   func liveFetchLarge() async throws {
     try self.context.install([.fetch])
@@ -891,6 +938,8 @@ private final class NonHTTPResponseProtocol: URLProtocol {
   override func stopLoading() {
   }
 }
+
+private struct UnavailablePromiseError: Error {}
 
 private struct TestBody: Codable {
   let a: String
