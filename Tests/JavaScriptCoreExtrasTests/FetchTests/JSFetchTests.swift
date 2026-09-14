@@ -763,8 +763,8 @@ struct JSFetchTests: @unchecked Sendable {
     } perform: { session in
       let resolvedOnInitiatingThread = try await withCheckedThrowingContinuation {
         (continuation: CheckedContinuation<Bool, Error>) in
-        Thread {
-            let initiatingThread = Thread.current
+        Thread.detachNewThread {
+          let initiatingThread = ObjectIdentifier(Thread.current)
           let context = JSContext()!
           do {
             try context.install([.fetch(session: session)])
@@ -785,7 +785,7 @@ struct JSFetchTests: @unchecked Sendable {
             return
           }
           promise.then { value in
-            continuation.resume(returning: Thread.current === initiatingThread)
+            continuation.resume(returning: ObjectIdentifier(Thread.current) == initiatingThread)
             CFRunLoopStop(CFRunLoopGetCurrent())
             return JSValue(undefinedIn: value.context)
           } onRejected: { error in
@@ -795,7 +795,6 @@ struct JSFetchTests: @unchecked Sendable {
           }
           CFRunLoopRun()
         }
-        .start()
       }
       expectNoDifference(resolvedOnInitiatingThread, true)
     }
