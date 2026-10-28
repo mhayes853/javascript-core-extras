@@ -173,13 +173,16 @@ extension JSURLSessionDataDelegate {
   }
 
   func rejectIfCancelled(for taskId: TaskID) -> Bool {
-    self.editState(for: taskId) { state in
+    let isCancelled = self.editState(for: taskId) { state in
       if let cancelReason = state.cancelReason {
         state.continuation?.resume(rejecting: cancelReason)
         return true
       }
       return false
     }
+    // The task is never resumed, so it will never complete and remove its state itself.
+    if isCancelled { self.removeState(for: taskId) }
+    return isCancelled
   }
 }
 
@@ -253,14 +256,26 @@ extension JSURLSessionDataDelegate: URLSessionDataDelegate {
     task: URLSessionTask,
     didCompleteWithError error: (any Error)?
   ) {
-    self.editState(for: task.taskIdentifier) { state in
+    let taskId = task.taskIdentifier
+    let needsBody = self.editState(for: taskId) { state in
       state.bodyCollector.finish(with: error)
-      guard !state.didResolveResponse else { return }
+      guard !state.didResolveResponse else { return false }
       if let error {
         self.resolveError(in: &state, error: error)
-      } else {
-        Task { await self.resolveResponse(task: task) }
+        return false
       }
+      return true
+    }
+    // The state holds the Promise continuation, whose JSValues retain the JSContext, so it must
+    // not outlive the task. A shared delegate would otherwise keep every context it has ever
+    // fetched from alive.
+    if needsBody {
+      Task {
+        await self.resolveResponse(task: task)
+        self.removeState(for: taskId)
+      }
+    } else {
+      self.removeState(for: taskId)
     }
   }
 
@@ -357,6 +372,10 @@ extension JSURLSessionDataDelegate {
     operation: @Sendable (inout State) -> T
   ) -> T {
     self.state.withLock { operation(&$0[taskId, default: State()]) }
+  }
+
+  private func removeState(for taskId: TaskID) {
+    self.state.withLock { _ = $0.removeValue(forKey: taskId) }
   }
 }
 

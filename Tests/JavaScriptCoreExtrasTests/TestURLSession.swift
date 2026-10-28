@@ -44,9 +44,7 @@ func withTestURLSessionHandlerAndHeaders<T: Sendable>(
     ),
   perform task: @Sendable @escaping (URLSession) async throws -> T
 ) async throws -> T {
-  let configuration = URLSessionConfiguration.ephemeral
-  configuration.protocolClasses = [TestURLProtocol.self]
-  let session = URLSession(configuration: configuration)
+  let session = URLSession(configuration: .test)
   return try await TestURLSessionHandler.shared.withHandler { request in
     let (status, value, _headers) = try await handler(request)
     var headers = _headers
@@ -61,6 +59,18 @@ func withTestURLSessionHandlerAndHeaders<T: Sendable>(
     return (response, data)
   } perform: {
     try await task(session)
+  }
+}
+
+// MARK: - Test Configuration
+
+extension URLSessionConfiguration {
+  /// An ephemeral configuration whose requests are answered by the handler passed to
+  /// ``withTestURLSessionHandler(handler:perform:)``.
+  static var test: URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [TestURLProtocol.self]
+    return configuration
   }
 }
 

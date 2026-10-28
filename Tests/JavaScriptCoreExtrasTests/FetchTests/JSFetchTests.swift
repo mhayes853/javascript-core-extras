@@ -531,6 +531,44 @@ struct JSFetchTests: @unchecked Sendable {
     expectNoDifference(value?.objectForKeyedSubscript("redirected").toBool(), true)
   }
 
+  @Test(
+    "Does Not Keep Its Context Alive After A Fetch Settles",
+    arguments: [
+      """
+      fetch("https://www.example.com").then((resp) => resp.text())
+      """,
+      """
+      fetch("https://www.example.com")
+      """,
+      """
+      fetch("https://www.example.com/fail")
+      """
+    ]
+  )
+  @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *)
+  func doesNotRetainContext(script: String) async throws {
+    try await withTestURLSessionHandler { request in
+      if request.url?.path == "/fail" {
+        throw URLError(.networkConnectionLost)
+      }
+      return (200, .data(Data("hello world".utf8)))
+    } perform: { session in
+      // A session without a JSURLSessionDataDelegate gets a delegate per task, while
+      // .fetch(sessionConfiguration:) shares one delegate between every task in its session.
+      let installables: [JSFetchInstaller] = [
+        .fetch(session: session),
+        .fetch(sessionConfiguration: .test)
+      ]
+      for installable in installables {
+        let lifetime = try await withContextLifetime(script: script) {
+          try $0.install([installable])
+        }
+        #expect(lifetime.didSettle)
+        #expect(lifetime.isFreed)
+      }
+    }
+  }
+
   @Test("Live Fetch")
   func liveFetch() async throws {
     try self.context.install([.fetch])
