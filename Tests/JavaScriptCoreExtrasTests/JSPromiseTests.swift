@@ -205,8 +205,35 @@ struct JSPromiseTests {
       .resolvedValue
     }
   }
+
+  @Test(
+    "Continuation Does Not Keep Its Context Alive",
+    arguments: [ContinuationOutcome.resolved, .rejected, .neverResumed]
+  )
+  func continuationDoesNotRetainContext(outcome: ContinuationOutcome) async throws {
+    let script = outcome == .neverResumed ? "void makePromise()" : "makePromise()"
+    let lifetime = try await withContextLifetime(script: script) { context in
+      let makePromise: @convention(block) () -> JSValue = {
+        JSPromise(in: .current()) { continuation in
+          switch outcome {
+          case .resolved: continuation.resume(resolving: 1)
+          case .rejected: continuation.resume(rejecting: 1)
+          case .neverResumed: break
+          }
+        }
+        .value
+      }
+      context.setObject(makePromise, forKeyedSubscript: "makePromise" as NSString)
+    }
+    #expect(lifetime.didSettle == (outcome != .neverResumed))
+    #expect(lifetime.isFreed)
+  }
 }
 
 @objc private protocol TestClassExport: JSExport {}
 
 @objc class TestClass: NSObject, TestClassExport {}
+
+enum ContinuationOutcome: Sendable {
+  case resolved, rejected, neverResumed
+}
